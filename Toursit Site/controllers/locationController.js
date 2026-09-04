@@ -132,6 +132,9 @@ const pingLocation = async (req, res, next) => {
         nationality: req.user.nationality || 'International'
       },
       location: { lat, lng },
+      altitude,
+      accuracy,
+      address,
       speed: speed || 0,
       batteryLevel: batteryLevel != null ? batteryLevel : 85,
       inRiskZone: warnings.length > 0,

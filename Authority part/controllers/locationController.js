@@ -14,7 +14,10 @@ const pingSchema = z.object({
     lng: z.number().min(-180).max(180)
   }).optional(),
   speed: z.number().optional(),
-  batteryLevel: z.number().min(0).max(100).optional()
+  batteryLevel: z.number().min(0).max(100).optional(),
+  altitude: z.number().optional(),
+  accuracy: z.number().optional(),
+  address: z.string().optional()
 }).refine((data) => (data.lat != null && data.lng != null) || data.location != null, {
   message: 'Coordinates (lat, lng) or location object required'
 });
@@ -26,6 +29,9 @@ const pingLocation = async (req, res, next) => {
     const lng = validated.lng ?? validated.location?.lng;
     const speed = validated.speed;
     const batteryLevel = validated.batteryLevel;
+    const altitude = validated.altitude || 0;
+    const accuracy = validated.accuracy || 5;
+    const address = validated.address || '';
     const touristId = req.user._id;
 
     // 1. Geospatial Query using MongoDB 2dsphere index ($geoIntersects)
@@ -70,6 +76,9 @@ const pingLocation = async (req, res, next) => {
         coordinates: [lng, lat]
       },
       activeRiskZones: activeZoneIds,
+      altitude,
+      accuracy,
+      address,
       speed,
       batteryLevel,
       timestamp: new Date()
@@ -123,6 +132,9 @@ const pingLocation = async (req, res, next) => {
         nationality: req.user.nationality || 'International'
       },
       location: { lat, lng },
+      altitude,
+      accuracy,
+      address,
       speed: speed || 0,
       batteryLevel: batteryLevel != null ? batteryLevel : 85,
       inRiskZone: warnings.length > 0,
