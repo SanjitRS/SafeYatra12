@@ -1,0 +1,240 @@
+### Base Variables
+@baseUrl = http://localhost:5000
+@touristEmail = maya.lin@gmail.com
+@authorityEmail = officer.vikram@safety.gov
+@password = Password123!
+
+### 1. Health Check
+GET {{baseUrl}}/health
+
+### 2. Register New Tourist
+# @name registerTourist
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Maya Lin",
+  "email": "maya.lin@gmail.com",
+  "password": "{{password}}",
+  "role": "tourist",
+  "phone": "+1-555-0199",
+  "nationality": "Canadian"
+}
+
+### 3. Login Tourist
+# @name loginTourist
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{touristEmail}}",
+  "password": "{{password}}"
+}
+
+### Store Tourist Token
+@touristToken = {{loginTourist.response.body.token}}
+
+### 4. Login Authority Officer
+# @name loginAuthority
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{authorityEmail}}",
+  "password": "{{password}}"
+}
+
+### Store Authority Token
+@authorityToken = {{loginAuthority.response.body.token}}
+
+### 5. Get Current User Info
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{touristToken}}
+
+### 6. Get Tourist Profile
+GET {{baseUrl}}/api/tourist/profile
+Authorization: Bearer {{touristToken}}
+
+### 7. Update Tourist Profile
+PUT {{baseUrl}}/api/tourist/profile
+Authorization: Bearer {{touristToken}}
+Content-Type: application/json
+
+{
+  "passportOrIdNumber": "CAN-8921894",
+  "emergencyContacts": [
+    {
+      "name": "David Lin",
+      "phone": "+1-555-0198",
+      "relation": "Father"
+    }
+  ],
+  "medicalInfo": {
+    "allergies": ["Penicillin", "Peanuts"],
+    "conditions": ["Mild Asthma"],
+    "bloodGroup": "O+"
+  },
+  "itinerary": [
+    {
+      "location": "Old Bazaar Heritage Quarter",
+      "startDate": "2026-09-01",
+      "endDate": "2026-09-08"
+    }
+  ]
+}
+
+### 8. Generate Digital Tourist ID (Signed JWT + Base64 QR Code)
+# @name generateId
+POST {{baseUrl}}/api/tourist/digital-id
+Authorization: Bearer {{touristToken}}
+
+### Extract QR payload for verification
+@qrPayload = {{generateId.response.body.digitalId.qrCodePayload}}
+
+### 9. Verify Scanned Digital ID (Authority Only)
+POST {{baseUrl}}/api/tourist/digital-id/verify
+Authorization: Bearer {{authorityToken}}
+Content-Type: application/json
+
+{
+  "qrCodePayload": "{{qrPayload}}"
+}
+
+### 10. Tourist Periodic Location Ping (Inside High-Risk Zone)
+POST {{baseUrl}}/api/location/ping
+Authorization: Bearer {{touristToken}}
+Content-Type: application/json
+
+{
+  "lat": 12.9716,
+  "lng": 77.5946,
+  "speed": 1.2,
+  "batteryLevel": 78
+}
+
+### 11. Tourist Periodic Location Ping (Safe Zone)
+POST {{baseUrl}}/api/location/ping
+Authorization: Bearer {{touristToken}}
+Content-Type: application/json
+
+{
+  "lat": 13.5000,
+  "lng": 78.5000,
+  "speed": 0.0,
+  "batteryLevel": 92
+}
+
+### 12. List Active Risk Zones
+GET {{baseUrl}}/api/risk-zones
+
+### 13. Filter Risk Zones by Bounding Box
+GET {{baseUrl}}/api/risk-zones?minLat=12.95&minLng=77.55&maxLat=12.99&maxLng=77.65
+
+### 14. AI Feature: Predicted Risk Zones & Spatial Density Clusters
+GET {{baseUrl}}/api/risk-zones/predicted
+
+### 15. Create New Risk Zone (Authority Only)
+# @name createZone
+POST {{baseUrl}}/api/risk-zones
+Authorization: Bearer {{authorityToken}}
+Content-Type: application/json
+
+{
+  "name": "North Harbor Abandoned Warehouses",
+  "description": "Reported gang activity, poorly illuminated alleyways",
+  "riskLevel": "high",
+  "category": "crime",
+  "center": {
+    "lat": 12.9850,
+    "lng": 77.6100
+  },
+  "radiusMeters": 600
+}
+
+@createdZoneId = {{createZone.response.body.data._id}}
+
+### 16. Trigger Emergency SOS (Tourist)
+# @name triggerSOS
+POST {{baseUrl}}/api/sos
+Authorization: Bearer {{touristToken}}
+Content-Type: application/json
+
+{
+  "location": {
+    "lat": 12.9716,
+    "lng": 77.5946
+  },
+  "message": "EMERGENCY! I am being followed by armed men with weapons down a dark alley. Send police now!"
+}
+
+@sosAlertId = {{triggerSOS.response.body.alertId}}
+
+### 17. List Active SOS Alerts (Authority Only)
+GET {{baseUrl}}/api/sos/active
+Authorization: Bearer {{authorityToken}}
+
+### 18. Acknowledge SOS Alert (Authority Only)
+PATCH {{baseUrl}}/api/sos/{{sosAlertId}}
+Authorization: Bearer {{authorityToken}}
+Content-Type: application/json
+
+{
+  "status": "acknowledged"
+}
+
+### 19. Resolve SOS Alert (Authority Only)
+PATCH {{baseUrl}}/api/sos/{{sosAlertId}}
+Authorization: Bearer {{authorityToken}}
+Content-Type: application/json
+
+{
+  "status": "resolved",
+  "resolutionNotes": "Rapid response team arrived on-scene. Suspects detained, tourist escorted safely."
+}
+
+### 20. Submit Incident Report (with AI Classification)
+# @name reportIncident
+POST {{baseUrl}}/api/incidents
+Authorization: Bearer {{touristToken}}
+Content-Type: application/json
+
+{
+  "type": "theft",
+  "description": "My backpack containing passport and laptop was stolen by pickpockets near the central bus terminal.",
+  "location": {
+    "lat": 12.9718,
+    "lng": 77.5948,
+    "address": "Central Bus Terminus, Platform 3"
+  }
+}
+
+@incidentId = {{reportIncident.response.body.data._id}}
+
+### 21. List Incidents
+GET {{baseUrl}}/api/incidents
+Authorization: Bearer {{authorityToken}}
+
+### 22. Get Single Incident by ID
+GET {{baseUrl}}/api/incidents/{{incidentId}}
+Authorization: Bearer {{touristToken}}
+
+### 23. Update Incident Investigation Status (Authority Only)
+PATCH {{baseUrl}}/api/incidents/{{incidentId}}/status
+Authorization: Bearer {{authorityToken}}
+Content-Type: application/json
+
+{
+  "status": "investigating",
+  "resolutionSummary": "Assigned Detective to inspect CCTV video feeds."
+}
+
+### 24. Authority Dashboard Summary
+GET {{baseUrl}}/api/authority/dashboard-summary
+Authorization: Bearer {{authorityToken}}
+
+### 25. Authority Query: Tourists Currently in Danger Zone
+GET {{baseUrl}}/api/authority/tourists-in-zone?zoneId={{createdZoneId}}
+Authorization: Bearer {{authorityToken}}
+
+### 26. Regional Safety Resources & Embassy Contacts
+GET {{baseUrl}}/api/safety/resources?region=bengaluru

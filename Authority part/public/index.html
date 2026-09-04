@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tourist Safety Platform - All-in-One Command Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .sos-pulse { animation: pulse-fast 1.5s infinite; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-rose-500/20">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg text-white leading-tight flex items-center gap-2">
+            Tourist Safety Platform
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">ALL-IN-ONE LIVE PORTAL</span>
+          </h1>
+          <p class="text-xs text-slate-400">Node.js • MongoDB 2dsphere • Socket.IO • AI Spatial Risk Engine</p>
+        </div>
+      </div>
+      
+      <!-- Quick Status & Credentials -->
+      <div class="flex items-center space-x-4 text-xs">
+        <div class="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span class="text-slate-300">WebSocket: <strong id="ws-status" class="text-emerald-400">Connecting...</strong></span>
+        </div>
+        <div class="hidden sm:flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300">
+          <i class="fa-solid fa-server text-indigo-400"></i>
+          <span>Host: <strong class="text-white">localhost:5000</strong></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="bg-slate-900 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-2 overflow-x-auto py-2 text-sm">
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-2 rounded-lg font-medium flex items-center gap-2 bg-indigo-600 text-white shadow">
+        <i class="fa-solid fa-chart-line"></i> Authority Dashboard
+      </button>
+      <button onclick="switchTab('digital-id')" id="tab-digital-id" class="tab-btn px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+        <i class="fa-solid fa-qrcode"></i> Digital Tourist ID
+      </button>
+      <button onclick="switchTab('geofence')" id="tab-geofence" class="tab-btn px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+        <i class="fa-solid fa-location-crosshairs"></i> Geofencing & GPS Pings
+      </button>
+      <button onclick="switchTab('sos')" id="tab-sos" class="tab-btn px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+        <i class="fa-solid fa-triangle-exclamation text-rose-400"></i> Emergency SOS
+      </button>
+      <button onclick="switchTab('ai')" id="tab-ai" class="tab-btn px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+        <i class="fa-solid fa-brain text-amber-400"></i> AI Risk Prediction
+      </button>
+      <button onclick="switchTab('api')" id="tab-api" class="tab-btn px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+        <i class="fa-solid fa-terminal text-cyan-400"></i> API Tester (22 Routes)
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Global Live Notification Banner for Socket.IO Events -->
+    <div id="live-toast-container" class="space-y-2"></div>
+
+    <!-- 1. TAB: AUTHORITY DASHBOARD -->
+    <section id="view-dashboard" class="space-y-6">
+      <!-- Metric Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>ACTIVE SOS ALERTS</span>
+            <i class="fa-solid fa-bell text-rose-400 text-base"></i>
+          </div>
+          <div class="text-3xl font-extrabold text-rose-500" id="stat-sos">...</div>
+          <p class="text-xs text-slate-400 mt-1">Requires immediate response</p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>OPEN INCIDENTS</span>
+            <i class="fa-solid fa-triangle-exclamation text-amber-400 text-base"></i>
+          </div>
+          <div class="text-3xl font-extrabold text-amber-400" id="stat-incidents">...</div>
+          <p class="text-xs text-slate-400 mt-1">Under investigation</p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>ACTIVE RISK ZONES</span>
+            <i class="fa-solid fa-map-location-dot text-indigo-400 text-base"></i>
+          </div>
+          <div class="text-3xl font-extrabold text-indigo-400" id="stat-zones">...</div>
+          <p class="text-xs text-slate-400 mt-1">2dsphere geofenced</p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>SYSTEM THREAT LEVEL</span>
+            <i class="fa-solid fa-shield-virus text-emerald-400 text-base"></i>
+          </div>
+          <div class="text-2xl font-extrabold text-emerald-400" id="stat-threat">NORMAL</div>
+          <p class="text-xs text-slate-400 mt-1" id="stat-tourists-active">Tourists monitored: ...</p>
+        </div>
+      </div>
+
+      <!-- Live Emergency Feeds and Situational Queries -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Active SOS Emergencies -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 class="font-bold text-white flex items-center gap-2">
+              <span class="h-2.5 w-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+              Live Emergency SOS Feed
+            </h2>
+            <button onclick="refreshDashboard()" class="text-xs text-indigo-400 hover:text-indigo-300">
+              <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+          </div>
+          <div id="sos-list" class="space-y-3 max-h-96 overflow-y-auto pr-1">
+            <p class="text-xs text-slate-400">Loading emergency queue...</p>
+          </div>
+        </div>
+
+        <!-- Situational Query: Tourists In Danger Zone -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 class="font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-users-viewfinder text-indigo-400"></i>
+              Situational Awareness: Tourists In Zone
+            </h2>
+            <span class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded">2dsphere Query</span>
+          </div>
+
+          <div class="flex gap-2">
+            <select id="zone-select" class="bg-slate-800 border border-slate-700 text-sm rounded-lg px-3 py-2 text-white flex-1 focus:outline-none focus:border-indigo-500">
+              <option value="">Loading risk zones...</option>
+            </select>
+            <button onclick="queryTouristsInZone()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-4 py-2 rounded-lg font-medium">
+              Query
+            </button>
+          </div>
+
+          <div id="tourists-in-zone-result" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+            <p class="text-xs text-slate-400">Select a risk zone above to detect tourists currently inside.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. TAB: DIGITAL TOURIST ID -->
+    <section id="view-digital-id" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Digital ID Card Generator -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 class="font-bold text-white text-lg">Tourist Digital ID Card</h2>
+              <p class="text-xs text-slate-400">Cryptographically signed with tamper-proof HMAC-SHA256 JWT</p>
+            </div>
+            <button onclick="generateDigitalId()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+              <i class="fa-solid fa-arrows-rotate"></i> Generate / Refresh
+            </button>
+          </div>
+
+          <!-- The Digital ID Graphic -->
+          <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-indigo-500/40 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+            <div class="flex items-start justify-between">
+              <div>
+                <span class="text-xs font-bold text-indigo-400 tracking-wider uppercase">INTERNATIONAL TOURIST SAFETY PASS</span>
+                <h3 class="text-xl font-extrabold text-white mt-1" id="card-name">Maya Lin</h3>
+                <p class="text-xs text-slate-400">Nationality: <strong class="text-slate-200" id="card-nat">Canadian</strong></p>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" id="card-status">
+                  VERIFIED ACTIVE
+                </span>
+              </div>
+            </div>
+
+            <div class="my-4 flex items-center justify-center bg-white p-3 rounded-xl max-w-[200px] mx-auto shadow-md">
+              <img id="card-qr-img" src="" alt="Digital ID QR" class="w-44 h-44 object-contain">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs border-t border-slate-700/60 pt-3">
+              <div>
+                <span class="text-slate-400">Blood Group:</span>
+                <p class="font-bold text-rose-400" id="card-blood">O+</p>
+              </div>
+              <div>
+                <span class="text-slate-400">Allergies:</span>
+                <p class="font-bold text-slate-200" id="card-allergies">Penicillin, Peanuts</p>
+              </div>
+              <div class="col-span-2">
+                <span class="text-slate-400">Emergency Contact:</span>
+                <p class="font-semibold text-slate-200" id="card-contact">David Lin (+1-555-0198) - Father</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payload Text box -->
+          <div>
+            <label class="text-xs text-slate-400">Signed JWT Payload (Base64 Scannable):</label>
+            <div class="flex gap-2 mt-1">
+              <input type="text" id="raw-jwt-input" readonly class="bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 rounded px-3 py-2 flex-1">
+              <button onclick="copyPayload()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded text-white">
+                <i class="fa-solid fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Authority Verifier Terminal -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <h2 class="font-bold text-white text-lg flex items-center gap-2">
+              <i class="fa-solid fa-id-card-clip text-indigo-400"></i>
+              Authority Verification Terminal
+            </h2>
+            <p class="text-xs text-slate-400">Decodes scanned QR code, verifies cryptographic signature, checks validity, and reveals emergency medical data with sensitive IDs redacted.</p>
+          </div>
+
+          <div class="space-y-3">
+            <label class="text-xs text-slate-300 font-medium">Scanned QR Payload:</label>
+            <textarea id="scan-payload-input" rows="3" placeholder="Paste scanned QR JWT payload here..." class="w-full bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 rounded-lg p-3 focus:outline-none focus:border-indigo-500"></textarea>
+            
+            <div class="flex gap-2">
+              <button onclick="autoPasteTouristId()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Use Active Tourist's ID
+              </button>
+              <button onclick="verifyScannedId()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-lg font-medium flex-1">
+                <i class="fa-solid fa-check-double"></i> Verify Signature & Expiry
+              </button>
+            </div>
+          </div>
+
+          <div id="verify-output" class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono min-h-[220px]">
+            <p class="text-slate-500">Click "Verify Signature & Expiry" to inspect results...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. TAB: GEOFENCING & LOCATION PINGS -->
+    <section id="view-geofence" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Location Ping Simulator -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <h2 class="font-bold text-white text-lg">GPS Location Telemetry Simulator</h2>
+            <p class="text-xs text-slate-400">Simulate periodic tourist GPS pings evaluated against 2dsphere polygons</p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-slate-400">Latitude</label>
+                <input type="number" step="0.0001" id="ping-lat" value="12.9716" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-white">
+              </div>
+              <div>
+                <label class="text-xs text-slate-400">Longitude</label>
+                <input type="number" step="0.0001" id="ping-lng" value="77.5946" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-white">
+              </div>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="flex gap-2">
+              <button onclick="setCoords(12.9716, 77.5946)" class="text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1.5 rounded hover:bg-rose-500/30">
+                ⚠️ Danger Preset (Old Bazaar Alley)
+              </button>
+              <button onclick="setCoords(12.9800, 77.6050)" class="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded hover:bg-amber-500/30">
+                🌊 Hazard Preset (Cliff Trail)
+              </button>
+              <button onclick="setCoords(13.5000, 78.5000)" class="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1.5 rounded hover:bg-emerald-500/30">
+                ✅ Safe Preset (Hotel Zone)
+              </button>
+            </div>
+
+            <button onclick="sendLocationPing()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg text-sm shadow-lg shadow-indigo-600/30">
+              <i class="fa-solid fa-satellite-dish"></i> Transmit Location Ping
+            </button>
+          </div>
+
+          <div id="ping-result" class="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs font-mono min-h-[160px]">
+            <p class="text-slate-500">Awaiting location transmission...</p>
+          </div>
+        </div>
+
+        <!-- Active 2dsphere Risk Zones List -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 class="font-bold text-white text-lg">Active Geospatial Risk Zones</h2>
+              <p class="text-xs text-slate-400">Indexed with MongoDB 2dsphere geometry</p>
+            </div>
+            <button onclick="loadRiskZonesList()" class="text-xs text-indigo-400 hover:text-indigo-300">
+              <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+          </div>
+
+          <div id="active-zones-list" class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+            <p class="text-xs text-slate-400">Loading risk zones...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. TAB: EMERGENCY SOS -->
+    <section id="view-sos" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Big Red SOS Button -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-6">
+          <div>
+            <h2 class="text-2xl font-black text-rose-500 uppercase tracking-wide">EMERGENCY SOS DISPATCH</h2>
+            <p class="text-xs text-slate-400 max-w-sm mt-1">
+              One-tap distress button. Immediately transmits live GPS coordinates, verified medical condition (allergies/blood group), and contacts to emergency police dispatch.
+            </p>
+          </div>
+
+          <button onclick="triggerSOSAlert()" class="sos-pulse h-44 w-44 rounded-full bg-gradient-to-tr from-red-600 to-rose-500 border-4 border-rose-400/50 shadow-2xl shadow-rose-600/50 flex flex-col items-center justify-center text-white hover:scale-105 active:scale-95 transition-all">
+            <i class="fa-solid fa-hand-fist text-4xl mb-1"></i>
+            <span class="text-2xl font-black tracking-wider">TAP SOS</span>
+            <span class="text-[10px] text-rose-200 uppercase font-semibold">1-Tap Immediate Dispatch</span>
+          </button>
+
+          <div class="w-full text-left space-y-2">
+            <label class="text-xs text-slate-400 font-medium">Distress Description (Analyzed by AI Classifier):</label>
+            <input type="text" id="sos-message-input" value="Help! Followed by 2 men with knives down a dark alley. Send police urgently!" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-white">
+          </div>
+        </div>
+
+        <!-- SOS Dispatch & Real-Time Socket.IO Log -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <h2 class="font-bold text-white text-lg flex items-center gap-2">
+              <i class="fa-solid fa-tower-broadcast text-rose-400"></i>
+              Real-Time Emergency Dispatch Log
+            </h2>
+            <p class="text-xs text-slate-400">Captures real-time Socket.IO alerts and AI threat rating</p>
+          </div>
+
+          <div id="sos-dispatch-output" class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono min-h-[300px] overflow-y-auto">
+            <p class="text-slate-500">Waiting for SOS activation...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. TAB: AI RISK PREDICTION ENGINE -->
+    <section id="view-ai" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4 gap-2">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-brain text-amber-400"></i>
+              Spatial-Temporal Risk Prediction Engine
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Mathematical Model: Spatial incident clustering with exponential half-life time-decay ($W(t) = e^{-\lambda \Delta t}$)
+            </p>
+          </div>
+          <button onclick="loadPredictedRiskZones()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-4 py-2 rounded-lg font-medium shadow-lg shadow-amber-600/30">
+            <i class="fa-solid fa-play"></i> Run Prediction Model
+          </button>
+        </div>
+
+        <!-- AI Metrics Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+            <span class="text-xs text-slate-400">MODEL VERSION</span>
+            <div class="text-sm font-bold text-amber-400 mt-1" id="ai-model-name">Spatial-Temporal Decay Clustering v2.0</div>
+            <p class="text-[11px] text-slate-500 mt-1">Half-life decay: 7 days</p>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+            <span class="text-xs text-slate-400">INCIDENTS INGESTED</span>
+            <div class="text-2xl font-bold text-white mt-1" id="ai-incidents-analyzed">0</div>
+            <p class="text-[11px] text-slate-500 mt-1">Multi-source verified reports</p>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+            <span class="text-xs text-slate-400">PREDICTED CLUSTERS DETECTED</span>
+            <div class="text-2xl font-bold text-indigo-400 mt-1" id="ai-clusters-count">0</div>
+            <p class="text-[11px] text-slate-500 mt-1">Calculated danger hotspots</p>
+          </div>
+        </div>
+
+        <!-- Predicted Clusters Display -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider">AI-Predicted Threat Clusters & Police Recommendations:</h3>
+          <div id="ai-clusters-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <p class="text-xs text-slate-400">Click "Run Prediction Model" to analyze incidents.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. TAB: API TESTER -->
+    <section id="view-api" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+        <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-white">Interactive API Endpoint Runner</h2>
+            <p class="text-xs text-slate-400">Directly execute and verify any of the platform routes</p>
+          </div>
+          <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded font-mono">22 Routes Available</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+          <button onclick="runApiTest('GET', '/health')" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-left rounded border border-slate-700">
+            <strong class="text-emerald-400">GET</strong> /health
+          </button>
+          <button onclick="runApiTest('GET', '/api/risk-zones/predicted')" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-left rounded border border-slate-700">
+            <strong class="text-emerald-400">GET</strong> /api/risk-zones/predicted
+          </button>
+          <button onclick="runApiTest('GET', '/api/risk-zones')" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-left rounded border border-slate-700">
+            <strong class="text-emerald-400">GET</strong> /api/risk-zones
+          </button>
+          <button onclick="runApiTest('GET', '/api/safety/resources?region=bengaluru')" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-left rounded border border-slate-700">
+            <strong class="text-emerald-400">GET</strong> /api/safety/resources
+          </button>
+          <button onclick="runApiTest('POST', '/api/auth/login', { email: 'maya.lin@gmail.com', password: 'Password123!' })" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-left rounded border border-slate-700">
+            <strong class="text-indigo-400">POST</strong> /api/auth/login (Tourist)
+          </button>
+          <button onclick="runApiTest('POST', '/api/auth/login', { email: 'officer.vikram@safety.gov', password: 'Password123!' })" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-left rounded border border-slate-700">
+            <strong class="text-indigo-400">POST</strong> /api/auth/login (Authority)
+          </button>
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <span>LIVE API JSON RESPONSE:</span>
+            <span id="api-status-tag" class="text-emerald-400 font-mono"></span>
+          </div>
+          <pre id="api-output" class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-emerald-400 max-h-96 overflow-y-auto">Select any endpoint button above to test live response...</pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-slate-800 text-slate-500 text-xs text-center py-6 mt-12">
+    Tourist Safety Platform • Built for Round 2 Task • Nexora The Vibe-Coding Club • NITTE
+  </footer>
+
+  <!-- App Client Scripts -->
+  <script>
+    let activeTouristToken = '';
+    let activeAuthorityToken = '';
+    let currentDigitalIdPayload = '';
+    let socket = null;
+
+    // Initialize Socket.IO
+    try {
+      socket = io();
+      socket.on('connect', () => {
+        document.getElementById('ws-status').textContent = 'CONNECTED';
+        showToast('WebSocket connected to live server', 'info');
+      });
+
+      socket.on('sos:emergency', (data) => {
+        showToast(`🚨 SOS TRIGGERED by ${data.tourist.name}! Location: ${data.location.lat}, ${data.location.lng}`, 'danger');
+        refreshDashboard();
+      });
+
+      socket.on('hazard:warning', (data) => {
+        showToast(`⚠️ RISK ZONE BREACH: Entering ${data.warnings[0]?.name}`, 'warning');
+      });
+
+      socket.on('sos:status_updated', (data) => {
+        showToast(`SOS Status Updated: ${data.status}`, 'info');
+        refreshDashboard();
+      });
+    } catch(e) {
+      console.warn('Socket error', e);
+    }
+
+    function showToast(msg, type = 'info') {
+      const colors = {
+        info: 'bg-indigo-600/90 border-indigo-400',
+        danger: 'bg-rose-600/90 border-rose-400 animate-bounce',
+        warning: 'bg-amber-600/90 border-amber-400',
+        success: 'bg-emerald-600/90 border-emerald-400'
+      };
+      const container = document.getElementById('live-toast-container');
+      const toast = document.createElement('div');
+      toast.className = `${colors[type] || colors.info} text-white text-xs px-4 py-2.5 rounded-lg border shadow-lg flex items-center justify-between transition-all`;
+      toast.innerHTML = `<span><strong>ALERT:</strong> ${msg}</span><button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-slate-200">&times;</button>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 8000);
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow');
+        btn.classList.add('text-slate-400');
+      });
+
+      document.getElementById(`view-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tabId}`);
+      activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow');
+      activeBtn.classList.remove('text-slate-400');
+
+      if (tabId === 'dashboard') refreshDashboard();
+      if (tabId === 'digital-id') loadTouristDigitalId();
+      if (tabId === 'geofence') loadRiskZonesList();
+      if (tabId === 'ai') loadPredictedRiskZones();
+    }
+
+    // Auto login demo users on startup
+    async function initDemoAuth() {
+      try {
+        const [touristRes, authRes] = await Promise.all([
+          fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'maya.lin@gmail.com', password: 'Password123!' })
+          }).then(r => r.json()),
+          fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'officer.vikram@safety.gov', password: 'Password123!' })
+          }).then(r => r.json())
+        ]);
+
+        if (touristRes.token) activeTouristToken = touristRes.token;
+        if (authRes.token) activeAuthorityToken = authRes.token;
+
+        refreshDashboard();
+        loadRiskZonesSelect();
+      } catch (e) {
+        console.error('Auth initialization error', e);
+      }
+    }
+
+    async function refreshDashboard() {
+      if (!activeAuthorityToken) return;
+      try {
+        const res = await fetch('/api/authority/dashboard-summary', {
+          headers: { Authorization: `Bearer ${activeAuthorityToken}` }
+        }).then(r => r.json());
+
+        if (res.summary) {
+          document.getElementById('stat-sos').textContent = res.summary.activeSOSAlerts;
+          document.getElementById('stat-incidents').textContent = res.summary.openIncidents;
+          document.getElementById('stat-zones').textContent = res.summary.activeRiskZones;
+          document.getElementById('stat-threat').textContent = res.summary.systemThreatLevel;
+          document.getElementById('stat-tourists-active').textContent = `Tourists monitored: ${res.summary.activeTourists24h}`;
+        }
+
+        // Render SOS feed
+        const sosRes = await fetch('/api/sos/active', {
+          headers: { Authorization: `Bearer ${activeAuthorityToken}` }
+        }).then(r => r.json());
+
+        const listContainer = document.getElementById('sos-list');
+        if (sosRes.data && sosRes.data.length > 0) {
+          listContainer.innerHTML = sosRes.data.map(alert => `
+            <div class="bg-slate-950 border ${alert.status === 'active' ? 'border-rose-500/50 bg-rose-950/10' : 'border-slate-800'} p-3 rounded-lg space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-white flex items-center gap-1.5">
+                  <i class="fa-solid fa-user text-rose-400"></i> ${alert.touristId?.name || 'Unknown Tourist'}
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${alert.status === 'active' ? 'bg-rose-500 text-white' : 'bg-amber-500/20 text-amber-300'}">
+                  ${alert.status}
+                </span>
+              </div>
+              <p class="text-xs text-slate-300 italic">"${alert.message}"</p>
+              <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <span>GPS: ${alert.location?.lat?.toFixed(4)}, ${alert.location?.lng?.toFixed(4)}</span>
+                <span>Blood: <strong class="text-rose-400">${alert.touristProfile?.bloodGroup || 'Unknown'}</strong></span>
+              </div>
+              ${alert.status === 'active' ? `
+                <div class="flex gap-2 pt-1">
+                  <button onclick="updateSos('${alert.id}', 'acknowledged')" class="text-xs bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded flex-1">
+                    Acknowledge
+                  </button>
+                  <button onclick="updateSos('${alert.id}', 'resolved')" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded flex-1">
+                    Resolve
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+          `).join('');
+        } else {
+          listContainer.innerHTML = `<p class="text-xs text-emerald-400">All emergency alerts currently resolved.</p>`;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function updateSos(alertId, status) {
+      await fetch(`/api/sos/${alertId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeAuthorityToken}`
+        },
+        body: JSON.stringify({ status, resolutionNotes: `Processed via Authority Live Portal (${status})` })
+      });
+      refreshDashboard();
+    }
+
+    async function loadRiskZonesSelect() {
+      const res = await fetch('/api/risk-zones').then(r => r.json());
+      const select = document.getElementById('zone-select');
+      if (res.data) {
+        select.innerHTML = res.data.map(z => `<option value="${z._id}">${z.name} (${z.riskLevel.toUpperCase()})</option>`).join('');
+      }
+    }
+
+    async function queryTouristsInZone() {
+      const zoneId = document.getElementById('zone-select').value;
+      if (!zoneId) return;
+
+      const res = await fetch(`/api/authority/tourists-in-zone?zoneId=${zoneId}`, {
+        headers: { Authorization: `Bearer ${activeAuthorityToken}` }
+      }).then(r => r.json());
+
+      const container = document.getElementById('tourists-in-zone-result');
+      if (res.tourists && res.tourists.length > 0) {
+        container.innerHTML = `<div class="text-xs font-bold text-rose-400 mb-2">${res.touristsCount} Tourist(s) Detected Inside ${res.zone.name}:</div>` +
+          res.tourists.map(t => `
+            <div class="bg-slate-950 border border-slate-800 p-3 rounded-lg text-xs space-y-1">
+              <div class="flex justify-between font-bold text-white">
+                <span>${t.tourist.name} (${t.tourist.nationality})</span>
+                <span class="text-rose-400">${t.medicalInfo.bloodGroup}</span>
+              </div>
+              <div class="text-slate-400">Phone: ${t.tourist.phone || 'N/A'}</div>
+              <div class="text-slate-400">Last Ping: ${t.lastPingLocation.lat}, ${t.lastPingLocation.lng}</div>
+            </div>
+          `).join('');
+      } else {
+        container.innerHTML = `<p class="text-xs text-emerald-400">No tourists currently located within this risk perimeter.</p>`;
+      }
+    }
+
+    async function loadTouristDigitalId() {
+      if (!activeTouristToken) return;
+      const res = await fetch('/api/tourist/digital-id', {
+        headers: { Authorization: `Bearer ${activeTouristToken}` }
+      }).then(r => r.json());
+
+      if (res.digitalId) {
+        document.getElementById('card-qr-img').src = res.digitalId.qrCodeImage;
+        document.getElementById('raw-jwt-input').value = res.digitalId.qrCodePayload;
+        currentDigitalIdPayload = res.digitalId.qrCodePayload;
+      }
+    }
+
+    async function generateDigitalId() {
+      const res = await fetch('/api/tourist/digital-id', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${activeTouristToken}` }
+      }).then(r => r.json());
+
+      if (res.digitalId) {
+        document.getElementById('card-qr-img').src = res.digitalId.qrCodeImage;
+        document.getElementById('raw-jwt-input').value = res.digitalId.qrCodePayload;
+        currentDigitalIdPayload = res.digitalId.qrCodePayload;
+        showToast('Generated fresh cryptographically signed Digital ID', 'success');
+      }
+    }
+
+    function copyPayload() {
+      navigator.clipboard.writeText(currentDigitalIdPayload);
+      showToast('JWT payload copied to clipboard!', 'info');
+    }
+
+    function autoPasteTouristId() {
+      document.getElementById('scan-payload-input').value = currentDigitalIdPayload;
+    }
+
+    async function verifyScannedId() {
+      const payload = document.getElementById('scan-payload-input').value.trim();
+      if (!payload) return;
+
+      const res = await fetch('/api/tourist/digital-id/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeAuthorityToken}`
+        },
+        body: JSON.stringify({ qrCodePayload: payload })
+      }).then(r => r.json());
+
+      document.getElementById('verify-output').innerHTML = `<pre class="text-emerald-400">${JSON.stringify(res, null, 2)}</pre>`;
+    }
+
+    function setCoords(lat, lng) {
+      document.getElementById('ping-lat').value = lat;
+      document.getElementById('ping-lng').value = lng;
+    }
+
+    async function sendLocationPing() {
+      const lat = parseFloat(document.getElementById('ping-lat').value);
+      const lng = parseFloat(document.getElementById('ping-lng').value);
+
+      const res = await fetch('/api/location/ping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeTouristToken}`
+        },
+        body: JSON.stringify({ lat, lng, speed: 1.2, batteryLevel: 80 })
+      }).then(r => r.json());
+
+      document.getElementById('ping-result').innerHTML = `<pre class="${res.inRiskZone ? 'text-rose-400' : 'text-emerald-400'}">${JSON.stringify(res, null, 2)}</pre>`;
+    }
+
+    async function loadRiskZonesList() {
+      const res = await fetch('/api/risk-zones').then(r => r.json());
+      const container = document.getElementById('active-zones-list');
+      if (res.data) {
+        container.innerHTML = res.data.map(z => `
+          <div class="bg-slate-950 border border-slate-800 p-3 rounded-lg text-xs space-y-1">
+            <div class="flex justify-between items-center">
+              <strong class="text-white">${z.name}</strong>
+              <span class="px-2 py-0.5 rounded uppercase font-bold text-[10px] ${z.riskLevel === 'critical' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-300'}">${z.riskLevel}</span>
+            </div>
+            <p class="text-slate-400">${z.description}</p>
+            <div class="text-slate-500">Category: ${z.category} • Radius: ${z.radiusMeters}m</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    async function triggerSOSAlert() {
+      const msg = document.getElementById('sos-message-input').value;
+      const res = await fetch('/api/sos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeTouristToken}`
+        },
+        body: JSON.stringify({
+          location: { lat: 12.9716, lng: 77.5946 },
+          message: msg
+        })
+      }).then(r => r.json());
+
+      document.getElementById('sos-dispatch-output').innerHTML = `<pre class="text-rose-400">${JSON.stringify(res, null, 2)}</pre>`;
+    }
+
+    async function loadPredictedRiskZones() {
+      const res = await fetch('/api/risk-zones/predicted').then(r => r.json());
+      if (res.data) {
+        document.getElementById('ai-model-name').textContent = res.data.model;
+        document.getElementById('ai-incidents-analyzed').textContent = res.data.totalIncidentsAnalyzed;
+        document.getElementById('ai-clusters-count').textContent = res.data.clustersFound;
+
+        const container = document.getElementById('ai-clusters-list');
+        container.innerHTML = res.data.predictedZones.map(c => `
+          <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl text-xs space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-white text-sm">${c.clusterId} (${c.dominantCategory.toUpperCase()})</span>
+              <span class="px-2 py-1 rounded font-extrabold ${c.riskScore >= 75 ? 'bg-rose-500 text-white' : 'bg-amber-500 text-slate-900'}">
+                SCORE: ${c.riskScore}/100
+              </span>
+            </div>
+            <p class="text-slate-300 italic">${c.explanation}</p>
+            <div class="bg-slate-900 border border-slate-800 p-2.5 rounded text-[11px] text-amber-300">
+              <strong>Tactical Action:</strong> ${c.suggestedAction}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    async function runApiTest(method, path, body = null) {
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      if (body) options.body = JSON.stringify(body);
+
+      const res = await fetch(path, options);
+      const data = await res.json();
+      document.getElementById('api-status-tag').textContent = `STATUS: ${res.status} ${res.statusText}`;
+      document.getElementById('api-output').textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Run startup
+    window.addEventListener('DOMContentLoaded', () => {
+      initDemoAuth();
+    });
+  </script>
+</body>
+</html>
