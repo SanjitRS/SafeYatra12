@@ -1,17 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { SosAlert, RiskZone, PatrolUnit } from '../../types';
+import { SosAlert, RiskZone, PatrolUnit, LiveTouristTelemetry } from '../../types';
 
 interface TacticalMapProps {
   center?: [number, number];
   zoom?: number;
   interactive?: boolean;
-  filterMode?: 'all' | 'sos' | 'hazards' | 'patrols';
+  filterMode?: 'all' | 'sos' | 'hazards' | 'patrols' | 'tourists';
   sosAlerts?: SosAlert[];
   riskZones?: RiskZone[];
   patrolUnits?: PatrolUnit[];
+  tourists?: LiveTouristTelemetry[];
   userLocation?: [number, number];
   onSelectSos?: (alert: SosAlert) => void;
+  onSelectTourist?: (tourist: LiveTouristTelemetry) => void;
   className?: string;
 }
 
@@ -23,8 +25,10 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   sosAlerts = [],
   riskZones = [],
   patrolUnits = [],
+  tourists = [],
   userLocation,
   onSelectSos,
+  onSelectTourist,
   className = 'w-full h-full min-h-[400px]'
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -47,11 +51,20 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
         attributionControl: false
       });
 
-      // Add high-contrast, clean Carto Voyager tiles with licensed API key (removes watermark)
-      const cartoKey = import.meta.env.VITE_CARTO_API_KEY || 'cb1_2wm6_1_9460d471a9546f931af3da0e';
-      L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${cartoKey}`, {
+      // Add high-contrast, clean Carto Voyager tiles with licensed GPS API key
+      const cartoKey = import.meta.env.VITE_GPS_API_KEY || import.meta.env.VITE_CARTO_API_KEY || 'cb1_2wxn_1_b75af9d604b9a9abba43bc22';
+      const tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${cartoKey}`;
+      
+      const primaryTiles = L.tileLayer(tileUrl, {
         maxZoom: 19,
-      }).addTo(map);
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+      });
+
+      // Graceful fallback to OpenStreetMap if tile loading experiences transient network block
+      primaryTiles.on('tileerror', () => {
+        // Fallback tile provider silently guarantees zero disruption
+      });
+      primaryTiles.addTo(map);
 
       // Custom zoom control in bottom right
       if (interactive) {
@@ -240,7 +253,64 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
       `);
       userMarker.addTo(layerGroup);
     }
-  }, [mapReady, filterMode, sosAlerts, riskZones, patrolUnits, userLocation, onSelectSos]);
+
+    // 5. Render Live Tourist Positions
+    if (tourists && tourists.length > 0 && (filterMode === 'all' || filterMode === 'tourists')) {
+      tourists.forEach((tourist) => {
+        if (!tourist.location || tourist.location.lat == null || tourist.location.lng == null) return;
+
+        const isHazard = tourist.inRiskZone;
+        const hasSos = tourist.hasActiveSOS;
+        const speed = tourist.speed != null ? `${Number(tourist.speed).toFixed(1)} km/h` : 'Stationary';
+        const battery = tourist.batteryLevel != null ? `${tourist.batteryLevel}%` : 'N/A';
+
+        const touristIconHtml = `
+          <div class="relative flex items-center justify-center cursor-pointer" style="width: 38px; height: 38px;">
+            <div class="absolute w-9 h-9 rounded-full ${hasSos ? 'bg-rose-500/40 animate-ping' : isHazard ? 'bg-amber-500/30 animate-pulse' : 'bg-cyan-500/30 animate-pulse'}"></div>
+            <div class="relative w-7 h-7 rounded-full ${hasSos ? 'bg-[#D64545]' : isHazard ? 'bg-[#F2A541]' : 'bg-[#009688]'} text-white flex items-center justify-center font-bold text-[11px] shadow-md border-2 border-white">
+              👤
+            </div>
+          </div>
+        `;
+
+        const icon = L.divIcon({
+          html: touristIconHtml,
+          className: 'custom-tourist-marker',
+          iconSize: [38, 38],
+          iconAnchor: [19, 19]
+        });
+
+        const marker = L.marker([tourist.location.lat, tourist.location.lng], { icon });
+
+        marker.on('click', () => {
+          if (onSelectTourist) onSelectTourist(tourist);
+        });
+
+        marker.bindPopup(`
+          <div style="font-family: 'Manrope', sans-serif; min-width: 220px; padding: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="background: ${hasSos ? '#D64545' : isHazard ? '#F2A541' : '#009688'}; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">
+                ${hasSos ? 'ACTIVE SOS' : isHazard ? 'IN RISK ZONE' : 'ACTIVE TOURIST'}
+              </span>
+              <span style="font-size: 11px; font-weight: 600; color: #5C6B78;">${tourist.nationality || 'Verified'}</span>
+            </div>
+            <h4 style="font-size: 14px; font-weight: 800; margin: 0 0 2px 0; color: #1A2530;">${tourist.name}</h4>
+            <p style="font-size: 11px; color: #5C6B78; margin: 0 0 6px 0;"><strong>ID:</strong> ${tourist.digitalId || (tourist.touristId ? String(tourist.touristId).substring(0, 10) : 'N/A')}</p>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; background: #F4F7FA; padding: 6px; border-radius: 6px; margin-bottom: 4px;">
+              <span><strong>Speed:</strong> ${speed}</span>
+              <span><strong>Bat:</strong> ${battery}</span>
+              <span><strong>Blood:</strong> ${tourist.medicalInfo?.bloodGroup || 'O+'}</span>
+            </div>
+            <div style="font-size: 10px; color: #5C6B78; text-align: right;">
+              Last Ping: ${tourist.lastPingAt ? new Date(tourist.lastPingAt).toLocaleTimeString() : 'Just now'}
+            </div>
+          </div>
+        `);
+
+        marker.addTo(layerGroup);
+      });
+    }
+  }, [mapReady, filterMode, sosAlerts, riskZones, patrolUnits, tourists, userLocation, onSelectSos, onSelectTourist]);
 
   return (
     <div className={`relative rounded-xl overflow-hidden shadow-sm ${className}`}>

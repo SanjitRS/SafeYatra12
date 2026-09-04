@@ -42,6 +42,18 @@ const locationPingSchema = new mongoose.Schema(
         ref: 'RiskZone'
       }
     ],
+    altitude: {
+      type: Number,
+      default: 0
+    },
+    accuracy: {
+      type: Number,
+      default: 5
+    },
+    address: {
+      type: String,
+      trim: true
+    },
     batteryLevel: {
       type: Number
     },

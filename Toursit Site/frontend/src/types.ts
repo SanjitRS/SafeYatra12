@@ -110,3 +110,32 @@ export interface EmergencyHelpline {
   icon: string;
   availability: string;
 }
+
+export interface LiveTouristTelemetry {
+  touristId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  digitalId?: string;
+  nationality?: string;
+  location: {
+    lat: number;
+    lng: number;
+    altitude?: number;
+    accuracy?: number;
+  };
+  speed?: number;
+  batteryLevel?: number;
+  accuracy?: number;
+  altitude?: number;
+  inRiskZone?: boolean;
+  hasActiveSOS?: boolean;
+  activeSosDetails?: any;
+  medicalInfo?: {
+    bloodGroup?: string;
+    allergies?: string[];
+    medications?: string[];
+  };
+  emergencyContacts?: any[];
+  lastPingAt: string;
+}

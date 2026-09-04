@@ -15,11 +15,17 @@ import {
   Clock,
   Compass,
   PhoneCall,
-  X
+  X,
+  Navigation,
+  Battery,
+  Gauge,
+  Satellite
 } from 'lucide-react';
 import { TacticalMap } from '../../components/common/TacticalMap';
 import { useSafety } from '../../lib/safetyStore';
-import { SosAlert } from '../../types';
+import { SosAlert, LiveTouristTelemetry } from '../../types';
+import { apiUrl } from '../../lib/api';
+import { io } from 'socket.io-client';
 
 export const AuthorityDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -35,13 +41,88 @@ export const AuthorityDashboard: React.FC = () => {
     userLocationName
   } = useSafety();
 
-  const authorityMapCenter: [number, number] = activeSosAlerts.length > 0 
-    ? [activeSosAlerts[0].location.lat, activeSosAlerts[0].location.lng] 
-    : userCoords;
+  const [mapCenterOverride, setMapCenterOverride] = useState<[number, number] | null>(null);
 
-  const [mapFilter, setMapFilter] = useState<'all' | 'sos' | 'hazards' | 'patrols'>('all');
+  const authorityMapCenter: [number, number] = mapCenterOverride 
+    || (activeSosAlerts.length > 0 
+      ? [activeSosAlerts[0].location.lat, activeSosAlerts[0].location.lng] 
+      : userCoords);
+
+  const [mapFilter, setMapFilter] = useState<'all' | 'sos' | 'hazards' | 'patrols' | 'tourists'>('all');
   const [quickLookupOpen, setQuickLookupOpen] = useState(false);
   const [lookupQuery, setLookupQuery] = useState('SY-84920');
+  const [liveTourists, setLiveTourists] = useState<LiveTouristTelemetry[]>([]);
+  const [selectedTourist, setSelectedTourist] = useState<LiveTouristTelemetry | null>(null);
+
+  // Fetch live tourist locations and listen for live GPS telemetry
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchTourists = async () => {
+      try {
+        const token = localStorage.getItem('authority_token') || localStorage.getItem('safeyatra_token') || sessionStorage.getItem('safeyatra_token');
+        const res = await fetch(apiUrl('/api/authority/tourists/live-locations'), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted && (data.data || data.tourists)) {
+            setLiveTourists(data.data || data.tourists || []);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load tourist locations', e);
+      }
+    };
+
+    fetchTourists();
+    const interval = setInterval(fetchTourists, 8000);
+
+    // Socket real-time GPS telemetry listener
+    let socket: any = null;
+    try {
+      socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
+      socket.on('tourist:location_update', (ping: any) => {
+        if (!mounted || !ping) return;
+        setLiveTourists((prev) => {
+          const tid = ping.touristId || ping.tourist?.id || (ping.tourist && ping.tourist._id);
+          const index = prev.findIndex((p) => String(p.touristId) === String(tid));
+          const updated: LiveTouristTelemetry = {
+            touristId: tid,
+            name: ping.tourist?.name || ping.touristName || 'Tourist',
+            nationality: ping.tourist?.nationality,
+            digitalId: ping.tourist?.digitalId,
+            phone: ping.tourist?.phone,
+            location: ping.location || { lat: ping.lat, lng: ping.lng },
+            speed: ping.speed,
+            batteryLevel: ping.batteryLevel,
+            inRiskZone: ping.inRiskZone,
+            hasActiveSOS: ping.hasActiveSOS,
+            medicalInfo: ping.tourist?.medicalInfo || { bloodGroup: ping.tourist?.bloodGroup },
+            lastPingAt: new Date().toISOString()
+          };
+          if (index >= 0) {
+            const next = [...prev];
+            next[index] = { ...next[index], ...updated };
+            return next;
+          } else {
+            return [updated, ...prev];
+          }
+        });
+      });
+    } catch {
+      // socket fallback
+    }
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      if (socket) socket.disconnect();
+    };
+  }, []);
   const [lookupResult, setLookupResult] = useState<any | null>({
     id: 'SY-84920',
     name: 'Priya Sharma',
@@ -254,7 +335,8 @@ export const AuthorityDashboard: React.FC = () => {
                   { id: 'all', label: 'All Layers' },
                   { id: 'sos', label: 'SOS Only' },
                   { id: 'hazards', label: 'AI Hazards' },
-                  { id: 'patrols', label: 'Patrol Units' }
+                  { id: 'patrols', label: 'Patrol Units' },
+                  { id: 'tourists', label: 'Live Tourists' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -333,7 +415,14 @@ export const AuthorityDashboard: React.FC = () => {
                 sosAlerts={activeSosAlerts}
                 riskZones={riskZones}
                 patrolUnits={patrolUnits}
+                tourists={liveTourists}
                 userLocation={userCoords}
+                onSelectTourist={(tourist) => {
+                  setSelectedTourist(tourist);
+                  if (tourist.location?.lat && tourist.location?.lng) {
+                    setMapCenterOverride([tourist.location.lat, tourist.location.lng]);
+                  }
+                }}
                 className="w-full h-full"
               />
             </div>
@@ -346,6 +435,140 @@ export const AuthorityDashboard: React.FC = () => {
                 108 Emergency Telemetry Repeaters Operational
               </span>
             </div>
+          </div>
+
+          {/* Real-Time Live Tourist GPS Radar & Telemetry Stream */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
+                  <Satellite className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1A2530] flex items-center gap-2">
+                    Live Tourist GPS Radar & Active Telemetry Feed
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
+                  </h3>
+                  <p className="text-xs text-[#5C6B78]">
+                    Continuous 2dsphere location streams, battery telemetry, and risk perimeter tracking
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-extrabold">
+                  {liveTourists.length} Monitored Signal{liveTourists.length === 1 ? '' : 's'}
+                </span>
+                <button
+                  onClick={() => setMapFilter('tourists')}
+                  className="px-3 py-1 bg-[#0B3D62] hover:bg-[#134B73] text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  Filter On Map
+                </button>
+              </div>
+            </div>
+
+            {liveTourists.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#5C6B78] flex flex-col items-center justify-center gap-2">
+                <Radio className="w-6 h-6 text-gray-400 animate-spin" />
+                <span>Scanning 2dsphere GPS repeaters for tourist telemetry pings...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 max-h-[360px] overflow-y-auto pr-1">
+                {liveTourists.map((t) => {
+                  const lat = t.location?.lat != null ? t.location.lat.toFixed(4) : 'N/A';
+                  const lng = t.location?.lng != null ? t.location.lng.toFixed(4) : 'N/A';
+                  const speed = t.speed != null ? `${Number(t.speed).toFixed(1)} km/h` : '0.0 km/h';
+                  const battery = t.batteryLevel != null ? `${t.batteryLevel}%` : 'N/A';
+                  const isHazard = t.inRiskZone;
+                  const hasSos = t.hasActiveSOS;
+
+                  return (
+                    <div 
+                      key={t.touristId}
+                      onClick={() => {
+                        setSelectedTourist(t);
+                        if (t.location?.lat && t.location?.lng) {
+                          setMapCenterOverride([t.location.lat, t.location.lng]);
+                        }
+                      }}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer hover:shadow-md ${
+                        hasSos 
+                          ? 'border-red-500 bg-red-50/40 shadow-red-100' 
+                          : isHazard 
+                          ? 'border-amber-400 bg-amber-50/30' 
+                          : 'border-gray-200 bg-[#F4F7FA]/40 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <h4 className="font-bold text-xs text-[#1A2530] flex items-center gap-1.5">
+                            {t.name}
+                            {t.nationality && (
+                              <span className="text-[10px] font-normal text-[#5C6B78] bg-gray-100 px-1.5 py-0.5 rounded">
+                                {t.nationality}
+                              </span>
+                            )}
+                          </h4>
+                          <span className="text-[10px] font-mono text-[#5C6B78]">
+                            ID: {t.digitalId || (t.touristId ? String(t.touristId).substring(0, 10) : 'Verified')}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {hasSos && (
+                            <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                              ACTIVE SOS
+                            </span>
+                          )}
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                            isHazard 
+                              ? 'bg-amber-100 text-amber-800' 
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {isHazard ? '⚠️ IN RISK ZONE' : '🛡️ SAFE CORRIDOR'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* GPS Telemetry Grid */}
+                      <div className="bg-white p-2 rounded-lg border border-gray-100 grid grid-cols-2 gap-2 text-[11px] mb-2.5 shadow-2xs">
+                        <div>
+                          <span className="text-[9px] text-[#5C6B78] uppercase font-bold block">Coordinates</span>
+                          <span className="font-mono text-[#0B3D62] font-bold">
+                            {lat}, {lng}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-[#5C6B78] uppercase font-bold block">Speed</span>
+                          <span className="font-semibold text-[#1A2530] flex items-center gap-1">
+                            <Gauge className="w-3 h-3 text-[#5C6B78]" /> {speed}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-[#5C6B78] uppercase font-bold block">Battery</span>
+                          <span className="font-semibold text-[#1A2530] flex items-center gap-1">
+                            <Battery className="w-3 h-3 text-emerald-600" /> {battery}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-[#5C6B78] uppercase font-bold block">Medical / Blood</span>
+                          <span className="font-bold text-red-600">
+                            {t.medicalInfo?.bloodGroup || 'O+'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-[#5C6B78]">
+                        <span>Last Ping: {t.lastPingAt ? new Date(t.lastPingAt).toLocaleTimeString() : 'Live'}</span>
+                        <span className="text-[#1C7293] font-bold hover:underline flex items-center gap-1">
+                          Lock Tactical Grid <ArrowRight className="w-3 h-3" />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Secondary Operational Panels: Live Patrol Readiness & AI Hazard Prediction */}

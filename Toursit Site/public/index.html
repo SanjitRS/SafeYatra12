@@ -158,6 +158,40 @@
           <div id="tourists-in-zone-result" class="space-y-3 max-h-80 overflow-y-auto pr-1">
             <p class="text-xs text-slate-400">Select a risk zone above to detect tourists currently inside.</p>
           </div>
+      </div>
+
+      <!-- Real-Time Tourist Radar & Live GPS Telemetry -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-3 gap-2">
+          <div class="flex items-center gap-3">
+            <div class="relative flex items-center justify-center h-4 w-4">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+            </div>
+            <div>
+              <h2 class="font-bold text-white flex items-center gap-2 text-base">
+                <i class="fa-solid fa-satellite text-cyan-400"></i>
+                Live Tourist GPS Radar & Real-Time Telemetry
+              </h2>
+              <p class="text-xs text-slate-400">Continuous 2dsphere location pings, battery telemetry, and risk perimeter tracking</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="live-tourist-count-badge" class="text-xs bg-cyan-500/20 text-cyan-300 font-bold px-2.5 py-1 rounded-full border border-cyan-500/30">
+              0 Active Signals
+            </span>
+            <button onclick="fetchLiveTouristLocations()" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
+              <i class="fa-solid fa-rotate"></i> Ping Radar
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Tourist Grid / Telemetry Cards -->
+        <div id="live-tourists-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[420px] overflow-y-auto pr-1">
+          <div class="col-span-full py-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+            <i class="fa-solid fa-satellite-dish text-2xl text-slate-500 animate-spin"></i>
+            <span>Scanning real-time tourist GPS telemetry repeaters...</span>
+          </div>
         </div>
       </div>
     </section>
@@ -485,6 +519,11 @@
         showToast(`SOS Status Updated: ${data.status}`, 'info');
         refreshDashboard();
       });
+
+      socket.on('tourist:location_update', (data) => {
+        showToast(`🛰️ GPS TELEMETRY: ${data.tourist?.name || 'Tourist'} pinged coordinates [${data.location?.lat?.toFixed(4)}, ${data.location?.lng?.toFixed(4)}]`, 'info');
+        updateOrPrependLiveTourist(data);
+      });
     } catch(e) {
       console.warn('Socket error', e);
     }
@@ -600,9 +639,156 @@
         } else {
           listContainer.innerHTML = `<p class="text-xs text-emerald-400">All emergency alerts currently resolved.</p>`;
         }
+
+        // Fetch Live Tourist GPS Radar Telemetry
+        await fetchLiveTouristLocations();
       } catch (e) {
         console.error(e);
       }
+    }
+
+    let liveTouristsCache = [];
+
+    async function fetchLiveTouristLocations() {
+      if (!activeAuthorityToken) return;
+      try {
+        const res = await fetch('/api/authority/tourists/live-locations', {
+          headers: { Authorization: `Bearer ${activeAuthorityToken}` }
+        }).then(r => r.json());
+
+        const tourists = res.data || res.tourists || [];
+        liveTouristsCache = tourists;
+        renderLiveTourists(tourists);
+      } catch (err) {
+        console.error('Failed to fetch live tourist telemetry:', err);
+      }
+    }
+
+    function renderLiveTourists(tourists) {
+      const container = document.getElementById('live-tourists-container');
+      const badge = document.getElementById('live-tourist-count-badge');
+      if (badge) badge.textContent = `${tourists.length} Active Signal${tourists.length === 1 ? '' : 's'}`;
+
+      if (!container) return;
+
+      if (!tourists || tourists.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full py-6 text-center text-slate-400 text-xs">
+            <i class="fa-solid fa-person-walking-arrow-right text-lg text-slate-500 mb-1"></i>
+            <p>No active tourist location signals recorded in the last 24 hours.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = tourists.map(t => {
+        const lat = t.location?.lat != null ? Number(t.location.lat).toFixed(4) : 'N/A';
+        const lng = t.location?.lng != null ? Number(t.location.lng).toFixed(4) : 'N/A';
+        const speed = t.speed != null ? `${Number(t.speed).toFixed(1)} km/h` : 'Stationary';
+        const battery = t.batteryLevel != null ? `${t.batteryLevel}%` : 'N/A';
+        const batteryColor = t.batteryLevel < 20 ? 'text-rose-400' : t.batteryLevel < 50 ? 'text-amber-400' : 'text-emerald-400';
+        const timeAgo = t.lastPingAt ? formatTimeAgo(new Date(t.lastPingAt)) : 'Just now';
+        const isHazard = t.inRiskZone;
+        const hasSos = t.hasActiveSOS;
+
+        return `
+          <div id="tourist-card-${t.touristId}" class="bg-slate-950 border ${hasSos ? 'border-rose-500 shadow-rose-500/20 shadow-lg' : isHazard ? 'border-amber-500/60' : 'border-slate-800'} p-4 rounded-xl space-y-3 transition-all">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-1.5 font-bold text-white text-sm">
+                  <span>${t.name}</span>
+                  ${t.nationality ? `<span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-normal">${t.nationality}</span>` : ''}
+                </div>
+                <div class="text-[11px] text-slate-400 font-mono">ID: ${t.digitalId || (t.touristId ? String(t.touristId).substring(0, 10) : 'Verified')}</div>
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                ${hasSos ? '<span class="bg-rose-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full animate-pulse">ACTIVE SOS</span>' : ''}
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isHazard ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}">
+                  ${isHazard ? '⚠️ IN RISK ZONE' : '🛡️ SAFE CORRIDOR'}
+                </span>
+              </div>
+            </div>
+
+            <!-- Coordinate & GPS telemetry block -->
+            <div class="bg-slate-900 border border-slate-800/80 rounded-lg p-2.5 text-xs grid grid-cols-2 gap-2">
+              <div>
+                <div class="text-[10px] text-slate-400 uppercase font-bold">Latitude</div>
+                <div class="font-mono text-cyan-300 font-bold">${lat}</div>
+              </div>
+              <div>
+                <div class="text-[10px] text-slate-400 uppercase font-bold">Longitude</div>
+                <div class="font-mono text-cyan-300 font-bold">${lng}</div>
+              </div>
+              <div>
+                <div class="text-[10px] text-slate-400 uppercase font-bold">Speed / Pacing</div>
+                <div class="text-slate-200 font-semibold flex items-center gap-1">
+                  <i class="fa-solid fa-gauge text-slate-500 text-[10px]"></i> ${speed}
+                </div>
+              </div>
+              <div>
+                <div class="text-[10px] text-slate-400 uppercase font-bold">Battery Life</div>
+                <div class="${batteryColor} font-semibold flex items-center gap-1">
+                  <i class="fa-solid fa-battery-half text-[10px]"></i> ${battery}
+                </div>
+              </div>
+            </div>
+
+            <!-- Health & Contact Snippet -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+              <span>Blood: <strong class="text-rose-400">${t.medicalInfo?.bloodGroup || 'O+'}</strong></span>
+              <span>Updated: <span class="text-slate-300">${timeAgo}</span></span>
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+              <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="flex-1 bg-indigo-600/80 hover:bg-indigo-600 text-white text-center text-xs py-1.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-location-arrow text-[11px]"></i> Map Lock
+              </a>
+              ${t.phone ? `
+                <a href="tel:${t.phone}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg transition" title="Call Tourist">
+                  <i class="fa-solid fa-phone"></i>
+                </a>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateOrPrependLiveTourist(ping) {
+      if (!ping) return;
+      const tid = ping.touristId || ping.tourist?.id || (ping.tourist && ping.tourist._id);
+      const existingIdx = liveTouristsCache.findIndex(t => (String(t.touristId) === String(tid) || (t.tourist && String(t.tourist._id) === String(tid))));
+
+      const updatedObj = {
+        touristId: tid,
+        name: ping.tourist?.name || ping.touristName || 'Tourist',
+        nationality: ping.tourist?.nationality,
+        digitalId: ping.tourist?.digitalId,
+        phone: ping.tourist?.phone,
+        location: ping.location || { lat: ping.lat, lng: ping.lng },
+        speed: ping.speed,
+        batteryLevel: ping.batteryLevel,
+        inRiskZone: ping.inRiskZone,
+        hasActiveSOS: ping.hasActiveSOS,
+        medicalInfo: ping.tourist?.medicalInfo || { bloodGroup: ping.tourist?.bloodGroup },
+        lastPingAt: new Date().toISOString()
+      };
+
+      if (existingIdx >= 0) {
+        liveTouristsCache[existingIdx] = { ...liveTouristsCache[existingIdx], ...updatedObj };
+      } else {
+        liveTouristsCache.unshift(updatedObj);
+      }
+      renderLiveTourists(liveTouristsCache);
+    }
+
+    function formatTimeAgo(date) {
+      const seconds = Math.floor((new Date() - date) / 1000);
+      if (seconds < 60) return 'Just now';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      return `${hours}h ago`;
     }
 
     async function updateSos(alertId, status) {

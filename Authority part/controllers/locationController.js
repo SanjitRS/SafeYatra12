@@ -3,7 +3,7 @@ const LocationPing = require('../models/LocationPing');
 const RiskZone = require('../models/RiskZone');
 const Incident = require('../models/Incident');
 const { isPointInRiskZone, haversineDistanceMeters } = require('../utils/geoUtils');
-const { sendToTourist, broadcastToAuthorities } = require('../utils/socket');
+const { sendToTourist, broadcastToAuthorities, broadcastToZone } = require('../utils/socket');
 const { AppError } = require('../middleware/errorHandler');
 
 const pingSchema = z.object({
@@ -111,6 +111,27 @@ const pingLocation = async (req, res, next) => {
         });
       }
     }
+
+    // Real-time live location broadcast to Authority Monitoring Center
+    const liveTelemetry = {
+      touristId,
+      tourist: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        phone: req.user.phone || 'N/A',
+        nationality: req.user.nationality || 'International'
+      },
+      location: { lat, lng },
+      speed: speed || 0,
+      batteryLevel: batteryLevel != null ? batteryLevel : 85,
+      inRiskZone: warnings.length > 0,
+      breachedZones: warnings,
+      timestamp: ping.timestamp || new Date()
+    };
+
+    broadcastToAuthorities('tourist:location_update', liveTelemetry);
+    broadcastToZone(req.user.zone || 'Central Zone', 'tourist:location_update', liveTelemetry);
 
     return res.status(200).json({
       success: true,

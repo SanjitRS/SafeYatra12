@@ -2,7 +2,11 @@ const express = require('express');
 const router = express.Router();
 
 // Controllers
-const { getDashboardSummary, getTouristsInZone } = require('../controllers/authorityController');
+const {
+  getDashboardSummary,
+  getTouristsInZone,
+  getLiveTouristLocations
+} = require('../controllers/authorityController');
 const {
   verifyTouristById,
   scanTouristQR,
@@ -33,6 +37,10 @@ router.use(authenticateAuthority);
 // Audit log of all verification scans (must precede :touristId parameter route)
 router.get('/tourists/verify/log', getVerificationAuditLog);
 router.get('/tourists/verify-log', getVerificationAuditLog);
+
+// Live Tourist Location Telemetry Tracking (must precede :touristId parameter route)
+router.get('/tourists/live-locations', getLiveTouristLocations);
+router.get('/live-locations', getLiveTouristLocations);
 
 // Look up a tourist by Digital Tourist ID / User ID
 router.get('/tourists/verify/:touristId', verifyTouristById);
