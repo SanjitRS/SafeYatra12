@@ -1,0 +1,399 @@
+{
+  "info": {
+    "name": "Tourist Safety Platform API",
+    "_postman_id": "9b12e345-7890-4abc-def1-23456789abcd",
+    "description": "Comprehensive Postman collection covering all authentication, tourist profile, digital QR ID, geofencing, emergency SOS, incident reporting, AI spatial clustering, and authority monitoring endpoints for the Tourist Safety Platform.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "touristToken", "value": "", "type": "string" },
+    { "key": "authorityToken", "value": "", "type": "string" },
+    { "key": "qrPayload", "value": "", "type": "string" },
+    { "key": "alertId", "value": "", "type": "string" },
+    { "key": "incidentId", "value": "", "type": "string" },
+    { "key": "zoneId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "01. Authentication",
+      "item": [
+        {
+          "name": "Register Tourist",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Maya Lin\",\n  \"email\": \"maya.lin@gmail.com\",\n  \"password\": \"Password123!\",\n  \"role\": \"tourist\",\n  \"phone\": \"+1-555-0199\",\n  \"nationality\": \"Canadian\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Register Authority Officer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Inspector Vikram Rao\",\n  \"email\": \"officer.vikram@safety.gov\",\n  \"password\": \"Password123!\",\n  \"role\": \"authority\",\n  \"phone\": \"+91-9876543210\",\n  \"nationality\": \"Indian\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login Tourist",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"maya.lin@gmail.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Login Authority",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"officer.vikram@safety.gov\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Get Current User Profile (/auth/me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{touristToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Tourist Profile & Safety Resources",
+      "item": [
+        {
+          "name": "Get Tourist Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{touristToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/tourist/profile", "host": ["{{baseUrl}}"], "path": ["api", "tourist", "profile"] }
+          }
+        },
+        {
+          "name": "Update Tourist Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{touristToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passportOrIdNumber\": \"CAN-8921894\",\n  \"emergencyContacts\": [\n    {\n      \"name\": \"David Lin\",\n      \"phone\": \"+1-555-0198\",\n      \"relation\": \"Father\"\n    }\n  ],\n  \"medicalInfo\": {\n    \"allergies\": [\"Penicillin\", \"Peanuts\"],\n    \"conditions\": [\"Mild Asthma\"],\n    \"bloodGroup\": \"O+\"\n  },\n  \"itinerary\": [\n    {\n      \"location\": \"Old Bazaar District\",\n      \"startDate\": \"2026-09-01\",\n      \"endDate\": \"2026-09-08\"\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/tourist/profile", "host": ["{{baseUrl}}"], "path": ["api", "tourist", "profile"] }
+          }
+        },
+        {
+          "name": "Get Tourist Dashboard Overview",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{touristToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/tourist/dashboard", "host": ["{{baseUrl}}"], "path": ["api", "tourist", "dashboard"] }
+          }
+        },
+        {
+          "name": "Get Regional Safety Resources",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/safety/resources?region=bengaluru",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "safety", "resources"],
+              "query": [{ "key": "region", "value": "bengaluru" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Digital Tourist ID",
+      "item": [
+        {
+          "name": "Generate Signed Digital ID (QR Code)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{touristToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/tourist/digital-id", "host": ["{{baseUrl}}"], "path": ["api", "tourist", "digital-id"] }
+          }
+        },
+        {
+          "name": "Get Active Digital ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{touristToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/tourist/digital-id", "host": ["{{baseUrl}}"], "path": ["api", "tourist", "digital-id"] }
+          }
+        },
+        {
+          "name": "Verify Digital ID (Authority Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authorityToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrCodePayload\": \"{{qrPayload}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/tourist/digital-id/verify", "host": ["{{baseUrl}}"], "path": ["api", "tourist", "digital-id", "verify"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Location-Based Safety",
+      "item": [
+        {
+          "name": "Ping Location (Inside Danger Zone)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{touristToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 12.9716,\n  \"lng\": 77.5946,\n  \"speed\": 1.4,\n  \"batteryLevel\": 78\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/location/ping", "host": ["{{baseUrl}}"], "path": ["api", "location", "ping"] }
+          }
+        },
+        {
+          "name": "Ping Location (Safe Area)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{touristToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 13.5000,\n  \"lng\": 78.5000,\n  \"speed\": 0.0,\n  \"batteryLevel\": 95\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/location/ping", "host": ["{{baseUrl}}"], "path": ["api", "location", "ping"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Risk & Safety Alerts",
+      "item": [
+        {
+          "name": "List Active Risk Zones",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/risk-zones", "host": ["{{baseUrl}}"], "path": ["api", "risk-zones"] }
+          }
+        },
+        {
+          "name": "Filter Risk Zones By Bounding Box",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/risk-zones?minLat=12.95&minLng=77.55&maxLat=12.99&maxLng=77.65",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "risk-zones"],
+              "query": [
+                { "key": "minLat", "value": "12.95" },
+                { "key": "minLng", "value": "77.55" },
+                { "key": "maxLat", "value": "12.99" },
+                { "key": "maxLng", "value": "77.65" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Risk Zone (Authority Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authorityToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"East Port Smuggling Pier\",\n  \"description\": \"Dangerous docks area with unauthorized cargo movements\",\n  \"riskLevel\": \"high\",\n  \"category\": \"crime\",\n  \"center\": {\n    \"lat\": 12.9650,\n    \"lng\": 77.5900\n  },\n  \"radiusMeters\": 500\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/risk-zones", "host": ["{{baseUrl}}"], "path": ["api", "risk-zones"] }
+          }
+        },
+        {
+          "name": "Re-evaluate Zones with AI (Authority Only)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authorityToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/risk-zones/reevaluate", "host": ["{{baseUrl}}"], "path": ["api", "risk-zones", "reevaluate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. AI Smart Feature - Predicted Risk Zones",
+      "item": [
+        {
+          "name": "Get AI Predicted Risk Zones & Spatial Clusters",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/risk-zones/predicted", "host": ["{{baseUrl}}"], "path": ["api", "risk-zones", "predicted"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Emergency SOS",
+      "item": [
+        {
+          "name": "Trigger Emergency SOS",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{touristToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"location\": {\n    \"lat\": 12.9716,\n    \"lng\": 77.5946\n  },\n  \"message\": \"Emergency! Trapped in narrow alley by aggressive armed men with knives! Need police immediately!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/sos", "host": ["{{baseUrl}}"], "path": ["api", "sos"] }
+          }
+        },
+        {
+          "name": "List Active SOS Alerts (Authority Only)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authorityToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/sos/active", "host": ["{{baseUrl}}"], "path": ["api", "sos", "active"] }
+          }
+        },
+        {
+          "name": "Acknowledge SOS Alert (Authority Only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authorityToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"acknowledged\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/sos/{{alertId}}", "host": ["{{baseUrl}}"], "path": ["api", "sos", "{{alertId}}"] }
+          }
+        },
+        {
+          "name": "Resolve SOS Alert (Authority Only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authorityToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"resolved\",\n  \"resolutionNotes\": \"Patrol unit reached on-scene in 4 minutes. Tourist safely escorted to embassy.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/sos/{{alertId}}", "host": ["{{baseUrl}}"], "path": ["api", "sos", "{{alertId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Incident Reporting",
+      "item": [
+        {
+          "name": "Submit Incident Report (JSON or Multipart)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{touristToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"theft\",\n  \"description\": \"Pickpockets bumped into me in the spice market and stole my passport and cash.\",\n  \"location\": {\n    \"lat\": 12.9718,\n    \"lng\": 77.5948,\n    \"address\": \"Old Bazaar Market St\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/incidents", "host": ["{{baseUrl}}"], "path": ["api", "incidents"] }
+          }
+        },
+        {
+          "name": "List Incidents (Role Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authorityToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/incidents", "host": ["{{baseUrl}}"], "path": ["api", "incidents"] }
+          }
+        },
+        {
+          "name": "Get Incident By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{touristToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/incidents/{{incidentId}}", "host": ["{{baseUrl}}"], "path": ["api", "incidents", "{{incidentId}}"] }
+          }
+        },
+        {
+          "name": "Update Incident Status (Authority Only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authorityToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"investigating\",\n  \"resolutionSummary\": \"Investigating officer reviewing CCTV footage from Bazaar lane 3.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/incidents/{{incidentId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "incidents", "{{incidentId}}", "status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Authority Monitoring",
+      "item": [
+        {
+          "name": "Get Dashboard Summary (Authority Only)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authorityToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/authority/dashboard-summary", "host": ["{{baseUrl}}"], "path": ["api", "authority", "dashboard-summary"] }
+          }
+        },
+        {
+          "name": "Get Tourists Inside Danger Zone (Authority Only)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authorityToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/authority/tourists-in-zone?zoneId={{zoneId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "authority", "tourists-in-zone"],
+              "query": [{ "key": "zoneId", "value": "{{zoneId}}" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

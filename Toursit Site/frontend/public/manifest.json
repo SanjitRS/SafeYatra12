@@ -1,0 +1,19 @@
+{
+  "short_name": "SafeYatra",
+  "name": "SafeYatra - Tourist Safety Companion",
+  "description": "Real-time tourist safety companion with instant emergency SOS, digital tourist ID QR verification, and 2dsphere geofencing alerts.",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/tourist",
+  "background_color": "#0f172a",
+  "theme_color": "#e11d48",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/"
+}

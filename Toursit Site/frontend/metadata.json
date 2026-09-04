@@ -1,0 +1,1 @@
+{"name":"SafeYatra - Tourist Safety Platform","description":"Integrated tourist safety companion and high-assurance authority command console featuring real-time SOS dispatch, risk zone GIS, and Digital Tourist ID verification.","requestFramePermissions":["geolocation"],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}

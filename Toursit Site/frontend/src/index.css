@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Manrope', system-ui, -apple-system, sans-serif;
+  
+  --color-brand-navy: #0B3D62;
+  --color-brand-teal: #1C7293;
+  --color-brand-amber: #F2A541;
+  --color-brand-dark: #002743;
+  --color-brand-light-navy: #134B73;
+  
+  --color-risk-low: #3FA34D;
+  --color-risk-medium: #F2A541;
+  --color-risk-high: #D64545;
+
+  --color-surface-base: #F4F7FA;
+  --color-surface-card: #FFFFFF;
+  --color-surface-dim: #E8EDF2;
+  --color-surface-border: #D8E0E8;
+  
+  --color-text-main: #1A2530;
+  --color-text-muted: #5C6B78;
+}
+
+/* Custom leaflet container resets for crisp rendering */
+.leaflet-container {
+  font-family: inherit;
+  width: 100%;
+  height: 100%;
+  background-color: #e5edf4;
+  z-index: 10;
+}
+
