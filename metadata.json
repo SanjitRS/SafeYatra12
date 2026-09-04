@@ -1,0 +1,6 @@
+{
+  "name": "SafeYatra - Tourist Safety Hub",
+  "description": "Interactive civilian security mesh and tourist companion portal featuring 1-tap SOS distress simulation, verified digital ID pass, safe corridor routing, and dual viewport architecture explorer.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
