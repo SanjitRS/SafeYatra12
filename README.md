@@ -1,4 +1,4 @@
-# 🛡️ SafeYatra12 — Tourist Safety & Authority Platform
+# 🛡️ SafeYatra— Tourist Safety & Authority Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-v20%2B-green.svg)](https://nodejs.org/)
