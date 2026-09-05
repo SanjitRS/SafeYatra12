@@ -114,6 +114,11 @@ flowchart TB
 ## ✨ Key Platform Features
 
 ### 📱 Tourist Safety Companion
+- **🤖 Gemini AI Emergency Voice & Action Assistant (Gemini 3.6 Flash)**:
+  - **Autonomous SOS Triggering**: Tourists in distress can speak or type (*"I fell down a ravine, press SOS!"* or *"Trigger SOS"*) $\rightarrow$ the AI activates the emergency distress beacon, plays the emergency alarm, broadcasts GPS coordinates, and navigates to live response tracking.
+  - **Emergency Contact Auto-Dialing**: Say *"Call my emergency contact"* or *"Call family"* $\rightarrow$ resolves the primary guardian/relative from profile and triggers direct phone dialing.
+  - **Emergency Hotlines One-Tap Calling**: Resolves **112 Universal**, **100 Police**, **108 Ambulance**, or **101 Fire** on natural command.
+  - **Live Speech-to-Text & Spoken Audio Responses**: Built-in voice recognition and speech synthesis for hands-free emergency communication, plus an offline heuristic fallback engine.
 - **Real-Time GPS Tracking & Map Pinning**:
   - Live hardware GPS coordinates acquisition via `navigator.geolocation` with sub-10m precision.
   - Automatic IP-based fallback geolocator (`ipwho.is` / `ip-api`) when hardware GPS is unavailable indoors.

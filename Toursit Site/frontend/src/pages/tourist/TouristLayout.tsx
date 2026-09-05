@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Home, ShieldAlert, QrCode, MapPin, Phone, User, CheckCircle2, Wifi, BatteryCharging } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useSafety } from '../../lib/safetyStore';
+import { AiEmergencyAssistant } from '../../components/common/AiEmergencyAssistant';
 
 export const TouristLayout: React.FC = () => {
   const location = useLocation();
@@ -68,6 +69,9 @@ export const TouristLayout: React.FC = () => {
             );
           })}
         </nav>
+
+        {/* Global AI Emergency Voice & SOS Assistant */}
+        <AiEmergencyAssistant />
       </div>
     );
   }
@@ -125,6 +129,9 @@ export const TouristLayout: React.FC = () => {
           })}
         </nav>
       </div>
+
+      {/* Global AI Emergency Voice & SOS Assistant */}
+      <AiEmergencyAssistant />
 
       {/* Trust & Architecture Reassurance Footer */}
       <div className="w-full max-w-[440px] mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-xs text-[#5C6B78]">
