@@ -263,12 +263,12 @@ export const ProfileSafetyInfo: React.FC = () => {
           type="button"
           onClick={() => {
             logoutTourist();
-            navigate('/tourist');
+            navigate('/tourist/auth');
           }}
           className="w-full py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-[#D64545] border border-red-200 text-xs font-bold transition-colors flex items-center justify-center gap-2 mt-2"
         >
           <LogOut className="w-4 h-4" />
-          <span>Switch Profile / Log Out</span>
+          <span>Switch Profile / Sign In with Another ID</span>
         </button>
       </form>
     </div>

@@ -12,7 +12,10 @@ import {
   ChevronRight,
   Crosshair,
   HeartPulse,
-  LogOut
+  LogOut,
+  Globe,
+  MapPin,
+  Loader2
 } from 'lucide-react';
 import { useSafety } from '../../lib/safetyStore';
 
@@ -27,8 +30,55 @@ export const TouristHome: React.FC = () => {
     userAltitude, 
     isLiveGps, 
     refreshLocation,
-    logoutTourist 
+    logoutTourist,
+    setUserLocation,
+    isLoggedIn 
   } = useSafety();
+
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+
+  const handleQuickGps = async () => {
+    setIsLocating(true);
+    try {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude, altitude } = pos.coords;
+            setUserLocation([latitude, longitude], `${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`, altitude ? Math.round(altitude) : undefined);
+            try {
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14`);
+              if (res.ok) {
+                const data = await res.json();
+                const place = data.address?.suburb || data.address?.town || data.address?.city || data.display_name?.split(',')[0] || 'Current Location';
+                const region = data.address?.state || '';
+                setUserLocation([latitude, longitude], region ? `${place}, ${region}` : place, altitude ? Math.round(altitude) : undefined);
+              }
+            } catch {}
+            setIsLocating(false);
+            setLocationConfirmed(true);
+          },
+          (err) => {
+            console.warn('[GPS Detection Error]', err);
+            setIsLocating(false);
+            refreshLocation().then(() => setLocationConfirmed(true));
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      } else {
+        await refreshLocation();
+        setIsLocating(false);
+        setLocationConfirmed(true);
+      }
+    } catch {
+      setIsLocating(false);
+    }
+  };
+
+  const handleSelectPresetCity = (name: string, coords: [number, number], alt: number) => {
+    setUserLocation(coords, name, alt);
+    setLocationConfirmed(true);
+  };
 
   // Hold-to-activate state for tactile thumb-zone SOS button
   const [holding, setHolding] = useState(false);
@@ -77,18 +127,24 @@ export const TouristHome: React.FC = () => {
   const circumference = 2 * Math.PI * circleRadius;
   const strokeDashoffset = circumference - (holdProgress / 100) * circumference;
 
+  const isPublicUser = tourist.name.toLowerCase().includes('public');
+
   return (
     <div className="flex flex-col w-full pb-6">
       {/* Top Welcome Header */}
       <div className="bg-[#0B3D62] text-white px-5 pt-4 pb-6 rounded-b-[28px] shadow-sm relative overflow-hidden">
         <div className="flex items-center justify-between mb-3 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-[#1C7293] flex items-center justify-center text-white font-extrabold text-lg shadow-inner">
-              {tourist.name.charAt(0)}
+            <div className={`w-11 h-11 rounded-full ${isPublicUser ? 'bg-emerald-600' : 'bg-[#1C7293]'} flex items-center justify-center text-white font-extrabold text-lg shadow-inner`}>
+              {isPublicUser ? (
+                <Globe className="w-5 h-5 text-white" />
+              ) : (
+                tourist.name.charAt(0)
+              )}
             </div>
             <div>
               <span className="text-[11px] text-cyan-200 uppercase tracking-wider font-semibold block">
-                Tourist Safety Profile
+                {isPublicUser ? 'Public Safety Deck' : 'Tourist Safety Profile'}
               </span>
               <h2 className="text-lg font-bold text-white leading-tight">
                 Namaste, {tourist.name.split(' ')[0]}
@@ -98,18 +154,18 @@ export const TouristHome: React.FC = () => {
 
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => navigate('/tourist/id')}
-              className="w-10 h-10 rounded-full bg-[#002743]/80 hover:bg-[#1C7293] flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20 shadow-sm"
-              title="Open Digital ID"
+              onClick={() => navigate('/tourist/auth')}
+              className="px-2.5 py-1.5 rounded-xl bg-[#002743]/80 hover:bg-[#1C7293] text-cyan-200 hover:text-white text-[10px] font-extrabold transition-colors border border-cyan-400/20 shadow-sm"
+              title="Sign In or Switch Profile"
             >
-              <QrCode className="w-5 h-5" />
+              Profile / Login
             </button>
             <button
-              onClick={() => logoutTourist()}
-              className="w-10 h-10 rounded-full bg-[#002743]/80 hover:bg-red-950/80 hover:text-red-400 flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20 shadow-sm"
-              title="Switch Profile / Log Out"
+              onClick={() => navigate('/tourist/id')}
+              className="w-9 h-9 rounded-full bg-[#002743]/80 hover:bg-[#1C7293] flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20 shadow-sm"
+              title="Open Digital ID"
             >
-              <LogOut className="w-4 h-4" />
+              <QrCode className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -129,6 +185,76 @@ export const TouristHome: React.FC = () => {
           <div className="flex items-center gap-1 text-emerald-400 text-[10px] font-bold shrink-0">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span>{isLiveGps ? 'Live Device' : 'Active Grid'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Public Safety & Location Quick Calibration Card */}
+      <div className="px-4 mt-3 relative z-20">
+        <div className="bg-gradient-to-br from-[#0B3D62] to-[#134B73] rounded-2xl p-3.5 text-white shadow-md border border-cyan-500/30">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-xs font-bold text-cyan-100 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                Emergency Rescue Grid Location
+              </span>
+            </div>
+            {locationConfirmed && (
+              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                ✓ Locked
+              </span>
+            )}
+          </div>
+
+          <p className="text-[11px] text-cyan-100/90 leading-snug mb-2.5">
+            SafeYatra transmits your exact location coordinates during SOS to 112 search-and-rescue dispatchers.
+          </p>
+
+          <div className="flex items-center gap-2 mb-2.5">
+            <button
+              type="button"
+              onClick={handleQuickGps}
+              disabled={isLocating}
+              className="flex-1 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
+            >
+              {isLocating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                  <span>Detecting GPS Coordinates...</span>
+                </>
+              ) : (
+                <>
+                  <Crosshair className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Detect My Live GPS</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Quick Destination Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            <span className="text-[10px] text-cyan-300 font-semibold shrink-0">Preset:</span>
+            {[
+              { name: 'Manali, HP', coords: [32.2432, 77.1892] as [number, number], alt: 2050 },
+              { name: 'Shimla, HP', coords: [31.1048, 77.1734] as [number, number], alt: 2276 },
+              { name: 'Kedarnath', coords: [30.7352, 79.0669] as [number, number], alt: 3583 },
+              { name: 'Rishikesh', coords: [30.0869, 78.2676] as [number, number], alt: 372 },
+              { name: 'Bengaluru', coords: [12.9716, 77.5946] as [number, number], alt: 920 }
+            ].map((city) => (
+              <button
+                key={city.name}
+                type="button"
+                onClick={() => handleSelectPresetCity(city.name, city.coords, city.alt)}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors border ${
+                  userLocationName?.includes(city.name.split(',')[0])
+                    ? 'bg-cyan-400 text-slate-950 border-cyan-300 shadow-sm'
+                    : 'bg-white/10 text-cyan-200 border-white/10 hover:bg-white/20'
+                }`}
+              >
+                {city.name}
+              </button>
+            ))}
           </div>
         </div>
       </div>

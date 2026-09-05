@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, MapPin, Radio, Crosshair, CheckCircle2, Navigation, Loader2 } from 'lucide-react';
+import { ShieldCheck, ArrowRight, MapPin, Radio, Crosshair, CheckCircle2, Navigation, Loader2, Globe } from 'lucide-react';
 import { useSafety } from '../../lib/safetyStore';
 
 interface DestinationPreset {
@@ -90,6 +90,23 @@ export const TouristAuth: React.FC = () => {
     setLocationLocked(true);
   };
 
+  const handlePublicAccess = () => {
+    loginTourist(
+      {
+        id: `TOURIST-PUB-${Math.floor(1000 + Math.random() * 9000)}`,
+        name: 'Public Traveler',
+        phone: 'Public Access',
+        email: 'public@safeyatra.in'
+      },
+      {
+        coords: selectedCoords,
+        name: selectedLocation,
+        altitude: selectedAltitude
+      }
+    );
+    navigate('/tourist');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     loginTourist(
@@ -138,12 +155,46 @@ export const TouristAuth: React.FC = () => {
       <h2 className="text-xl font-extrabold text-[#0B3D62] text-center">
         SafeYatra Tourist Companion
       </h2>
-      <p className="text-xs text-[#5C6B78] text-center max-w-xs mt-1">
-        Login and authorize your location telemetry to enable real-time 112 emergency dispatch and risk geofencing.
+      <p className="text-xs text-[#5C6B78] text-center max-w-xs mt-1 mb-4">
+        Public safety portal with live emergency SOS, real-time risk zone geofencing, and 112 dispatch.
       </p>
 
+      {/* Instant Public Access Card */}
+      <div className="w-full max-w-sm bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-2xl p-3.5 mb-4 shadow-sm">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-xs font-bold text-emerald-950 flex items-center gap-1">
+              <Globe className="w-3.5 h-3.5 text-emerald-600" />
+              Public Safety Access
+            </span>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+            No Login Needed
+          </span>
+        </div>
+        <p className="text-[11px] text-emerald-800 leading-snug mb-3">
+          Open access for all travelers: Emergency SOS, live risk zone map, and official helplines available immediately.
+        </p>
+        <button
+          type="button"
+          onClick={handlePublicAccess}
+          className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-colors flex items-center justify-center gap-2 shadow-sm"
+        >
+          <Globe className="w-4 h-4" />
+          <span>Continue with Instant Public Access</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="w-full max-w-sm flex items-center gap-2 my-1 mb-3">
+        <div className="flex-1 h-[1px] bg-slate-200" />
+        <span className="text-[10px] uppercase font-bold text-slate-400">or sign in with digital id</span>
+        <div className="flex-1 h-[1px] bg-slate-200" />
+      </div>
+
       {/* Auth Mode Toggle */}
-      <div className="w-full max-w-sm mt-5 p-1 rounded-xl bg-[#E8EDF2] flex items-center">
+      <div className="w-full max-w-sm p-1 rounded-xl bg-[#E8EDF2] flex items-center">
         <button
           type="button"
           onClick={() => setIsRegister(false)}
