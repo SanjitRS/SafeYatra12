@@ -154,18 +154,18 @@ export const TouristHome: React.FC = () => {
 
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => navigate('/tourist/auth')}
-              className="px-2.5 py-1.5 rounded-xl bg-[#002743]/80 hover:bg-[#1C7293] text-cyan-200 hover:text-white text-[10px] font-extrabold transition-colors border border-cyan-400/20 shadow-sm"
-              title="Sign In or Switch Profile"
-            >
-              Profile / Login
-            </button>
-            <button
               onClick={() => navigate('/tourist/id')}
               className="w-9 h-9 rounded-full bg-[#002743]/80 hover:bg-[#1C7293] flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20 shadow-sm"
               title="Open Digital ID"
             >
               <QrCode className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => logoutTourist()}
+              className="w-9 h-9 rounded-full bg-[#002743]/80 hover:bg-red-900/80 hover:text-red-300 flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20 shadow-sm"
+              title="Log Out (Compulsory Login)"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -807,8 +807,7 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    const saved = localStorage.getItem('safeyatra_tourist_logged_in');
-    return saved !== null ? saved === 'true' : true;
+    return localStorage.getItem('safeyatra_tourist_logged_in') === 'true';
   });
 
   const setUserLocation = useCallback((coords: [number, number], name: string, altitude?: number) => {
@@ -847,8 +846,7 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [sendLocationPing]);
 
   const logoutTourist = useCallback(() => {
-    setIsLoggedIn(true); // Remain accessible to public
-    setTourist(INITIAL_TOURIST);
+    setIsLoggedIn(false);
     localStorage.removeItem('safeyatra_tourist_logged_in');
     localStorage.removeItem(STORAGE_KEYS.TOURIST);
   }, []);
