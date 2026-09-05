@@ -1,0 +1,20 @@
+﻿services:
+  - type: web
+    name: tourist-safety-app
+    env: docker
+    dockerfilePath: Toursit Site/Dockerfile
+    dockerContext: Toursit Site
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  - type: web
+    name: authority-command-center
+    env: docker
+    dockerfilePath: Authority part/Dockerfile
+    dockerContext: Authority part
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production

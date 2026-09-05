@@ -40,8 +40,8 @@ export default function App() {
           {/* Global Header is displayed on desktop web only, hidden on Android app */}
           {!isNative && <GlobalHeader />}
           <Routes>
-            {/* Native Android opens Tourist App directly; Web opens Authority Console directly */}
-            <Route path="/" element={<Navigate to={isNative ? "/tourist" : "/authority"} replace />} />
+            {/* Opens Tourist App by default */}
+            <Route path="/" element={<Navigate to="/tourist" replace />} />
 
             {/* Tourist App Routes */}
             <Route path="/tourist" element={<TouristLayout />}>
@@ -66,7 +66,7 @@ export default function App() {
             </Route>
 
             {/* Fallback */}
-            <Route path="*" element={<Navigate to={isNative ? "/tourist" : "/authority"} replace />} />
+            <Route path="*" element={<Navigate to="/tourist" replace />} />
           </Routes>
         </BrowserRouter>
       </SafetyProvider>

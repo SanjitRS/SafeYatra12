@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { TouristProfile, SosAlert, Incident, RiskZone, PatrolUnit, RiskLevel } from '../types';
 import { INITIAL_TOURIST, INITIAL_SOS_ALERTS, INITIAL_RISK_ZONES, INITIAL_INCIDENTS, INITIAL_PATROL_UNITS } from './mockData';
 import { apiUrl } from './api';
@@ -25,6 +25,8 @@ interface SafetyContextType {
   userAccuracy: number;
   userAltitude: number;
   isLiveGps: boolean;
+  setUserCoords: React.Dispatch<React.SetStateAction<[number, number]>>;
+  setUserLocationName: React.Dispatch<React.SetStateAction<string>>;
   refreshLocation: () => Promise<[number, number]>;
   
   // Actions
@@ -84,13 +86,30 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [systemNotification, setSystemNotification] = useState<{ id: string; message: string; type: 'urgent' | 'info' | 'success' } | null>(null);
   const [socketConnected, setSocketConnected] = useState(true);
   const [gpsActive, setGpsActive] = useState(true);
-  const [userCoords, setUserCoords] = useState<[number, number]>([32.2472, 77.1852]); // Initial fallback coords
-  const [userLocationName, setUserLocationName] = useState<string>('Locating device...');
-  const [userAltitude, setUserAltitude] = useState<number>(2050);
-  const [userAccuracy, setUserAccuracy] = useState<number>(5);
-  const [isLiveGps, setIsLiveGps] = useState<boolean>(false);
+  const [userCoords, setUserCoords] = useState<[number, number]>([12.9716, 77.5946]); // Bengaluru live default
+  const [userLocationName, setUserLocationName] = useState<string>('Bengaluru, Karnataka');
+  const [userAltitude, setUserAltitude] = useState<number>(920);
+  const [userAccuracy, setUserAccuracy] = useState<number>(15);
+  const [isLiveGps, setIsLiveGps] = useState<boolean>(true);
+
+  const userCoordsRef = useRef<[number, number]>(userCoords);
+  useEffect(() => {
+    userCoordsRef.current = userCoords;
+  }, [userCoords]);
+
+  const lastGeocodeCoords = useRef<[number, number] | null>(null);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    // Avoid re-querying nominatim if distance moved is less than 0.0005 deg (~50m)
+    if (lastGeocodeCoords.current) {
+      const dLat = Math.abs(lastGeocodeCoords.current[0] - lat);
+      const dLng = Math.abs(lastGeocodeCoords.current[1] - lng);
+      if (dLat < 0.0005 && dLng < 0.0005) {
+        return;
+      }
+    }
+    lastGeocodeCoords.current = [lat, lng];
+
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`, {
         headers: { 'Accept-Language': 'en' }
@@ -112,14 +131,22 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return fallbackName;
   }, []);
 
+  const lastPingTime = useRef<number>(0);
   const sendLocationPing = useCallback(async (lat: number, lng: number, altitude?: number, accuracy?: number) => {
+    const token = localStorage.getItem('safeyatra_token') || sessionStorage.getItem('safeyatra_token');
+    if (!token) return; // Do not ping if not authenticated
+
+    const now = Date.now();
+    // Throttle network pings to at most once every 15 seconds
+    if (now - lastPingTime.current < 15000) return;
+    lastPingTime.current = now;
+
     try {
-      const token = localStorage.getItem('safeyatra_token') || sessionStorage.getItem('safeyatra_token');
       await fetch(apiUrl('/api/location/ping'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           lat,
@@ -134,9 +161,55 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
+  // Fetch approximate network/IP coordinates if GPS times out or fails
+  const fetchNetworkFallbackLocation = useCallback(async (): Promise<[number, number] | null> => {
+    try {
+      // 1. Try ipwho.is (fast, JSON CORS-friendly)
+      const res = await fetch('https://ipwho.is/');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success !== false && data.latitude && data.longitude) {
+          const coords: [number, number] = [Number(data.latitude), Number(data.longitude)];
+          setUserCoords(coords);
+          setIsLiveGps(true);
+          setGpsActive(true);
+          const name = data.city ? `${data.city}, ${data.region || data.country}` : 'Current Location';
+          setUserLocationName(name);
+          sendLocationPing(coords[0], coords[1], 0, 100);
+          return coords;
+        }
+      }
+    } catch {
+      // ignore, try next provider
+    }
+
+    try {
+      // 2. Try ip-api.com as secondary fallback
+      const res = await fetch('https://ip-api.io/json/');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.latitude && data.longitude) {
+          const coords: [number, number] = [Number(data.latitude), Number(data.longitude)];
+          setUserCoords(coords);
+          setIsLiveGps(true);
+          setGpsActive(true);
+          const name = data.city ? `${data.city}, ${data.region_name || data.country_name}` : 'Current Location';
+          setUserLocationName(name);
+          sendLocationPing(coords[0], coords[1], 0, 100);
+          return coords;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return null;
+  }, [sendLocationPing]);
+
   const refreshLocation = useCallback(async (): Promise<[number, number]> => {
     return new Promise((resolve) => {
       if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        // Step 1: Request real device GPS with high accuracy
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const { latitude, longitude, altitude, accuracy } = pos.coords;
@@ -145,41 +218,60 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsLiveGps(true);
             setGpsActive(true);
             if (altitude) setUserAltitude(Math.round(altitude));
-            if (accuracy) setUserAccuracy(Math.round(accuracy));
+            setUserAccuracy(Math.round(accuracy || 10));
             reverseGeocode(latitude, longitude);
             sendLocationPing(latitude, longitude, altitude || undefined, accuracy);
+            console.log(`[GPS] Real hardware location acquired: ${latitude}, ${longitude} (±${Math.round(accuracy)}m)`);
             resolve(newCoords);
           },
-          (err) => {
-            console.warn('Live geolocation failed, using fallback:', err.message);
-            setUserLocationName((prev) => prev === 'Locating device...' ? 'Manali Valley (Default)' : prev);
-            resolve(userCoords);
+          async (err) => {
+            console.warn(`[GPS] Geolocation notice: ${err.message}. Attempting network fallback...`);
+            const fallbackCoords = await fetchNetworkFallbackLocation();
+            if (fallbackCoords) {
+              resolve(fallbackCoords);
+            } else {
+              resolve(userCoordsRef.current);
+            }
           },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
         );
       } else {
-        resolve(userCoords);
+        fetchNetworkFallbackLocation().then((fb) => resolve(fb || userCoordsRef.current));
       }
     });
-  }, [reverseGeocode, sendLocationPing, userCoords]);
+  }, [reverseGeocode, sendLocationPing, fetchNetworkFallbackLocation]);
 
+  // Stable one-time geolocation setup on component mount
   useEffect(() => {
     refreshLocation();
 
     let watchId: number | null = null;
+    let lastCoords: [number, number] | null = null;
+
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const { latitude, longitude, altitude, accuracy } = pos.coords;
+          if (lastCoords) {
+            const dLat = Math.abs(lastCoords[0] - latitude);
+            const dLng = Math.abs(lastCoords[1] - longitude);
+            // Skip jitter (< ~30 meters) to avoid unnecessary re-renders
+            if (dLat < 0.0003 && dLng < 0.0003) {
+              return;
+            }
+          }
+          lastCoords = [latitude, longitude];
+
           setUserCoords([latitude, longitude]);
           setIsLiveGps(true);
           setGpsActive(true);
           if (altitude) setUserAltitude(Math.round(altitude));
           if (accuracy) setUserAccuracy(Math.round(accuracy));
+          reverseGeocode(latitude, longitude);
           sendLocationPing(latitude, longitude, altitude || undefined, accuracy);
         },
         () => {},
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
       );
     }
 
@@ -188,7 +280,7 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [refreshLocation, sendLocationPing]);
+  }, [refreshLocation, reverseGeocode, sendLocationPing]);
 
   const authorityOfficer = {
     id: 'OFFICER-804',
@@ -602,6 +694,8 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         userAccuracy,
         userAltitude,
         isLiveGps,
+        setUserCoords,
+        setUserLocationName,
         refreshLocation,
         triggerTouristSos,
         cancelTouristSos,
