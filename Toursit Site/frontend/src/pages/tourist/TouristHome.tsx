@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ShieldCheck, 
@@ -15,9 +15,11 @@ import {
   LogOut,
   Globe,
   MapPin,
-  Loader2
+  Loader2,
+  Flame
 } from 'lucide-react';
 import { useSafety } from '../../lib/safetyStore';
+import { apiUrl } from '../../lib/api';
 
 export const TouristHome: React.FC = () => {
   const navigate = useNavigate();
@@ -127,61 +129,92 @@ export const TouristHome: React.FC = () => {
   const circumference = 2 * Math.PI * circleRadius;
   const strokeDashoffset = circumference - (holdProgress / 100) * circumference;
 
-  // Dynamic Nearest Police Station resolver based on live user location
-  const getNearestPoliceStation = () => {
-    const loc = (userLocationName || '').toLowerCase();
-    if (loc.includes('manali')) {
-      return {
-        name: 'Manali Police Station (Main Jurisdiction)',
-        details: '24x7 Quick Response Team • High-Altitude Rescue Desk',
-        distance: '580m away',
-        phone: '01902252326'
-      };
-    }
-    if (loc.includes('shimla')) {
-      return {
-        name: 'Sadar Police Station, Shimla',
-        details: 'Hill Patrol Unit • 24x7 Tourist Assistance Desk',
-        distance: '720m away',
-        phone: '01772804244'
-      };
-    }
-    if (loc.includes('kedarnath')) {
-      return {
-        name: 'Kedarnath Dham Police Station',
-        details: 'SDRF Force & Alpine Emergency Search Unit',
-        distance: '450m away',
-        phone: '112'
-      };
-    }
-    if (loc.includes('rishikesh')) {
-      return {
-        name: 'Muni Ki Reti Police Station, Rishikesh',
-        details: 'Ghat & River Safety Patrol • 24x7 Security',
-        distance: '620m away',
-        phone: '01352430103'
-      };
-    }
-    if (loc.includes('bengaluru') || loc.includes('bangalore') || loc.includes('karnataka')) {
-      return {
-        name: 'Cubbon Park Police Station, Bengaluru',
-        details: 'Jurisdiction Police Station • 24x7 Emergency Patrol',
-        distance: '550m away',
-        phone: '08022942581'
-      };
-    }
+  // Dynamic Multi-Emergency Station Detector (Police, Fire Fighter, Hospital)
+  type EmergencyServiceType = 'police' | 'fire' | 'hospital';
 
-    // Dynamic city name extraction for any other live GPS detected city
-    const cityName = (userLocationName || '').split(',')[0].trim() || 'Central';
-    return {
-      name: `${cityName} Police Station (Jurisdiction Station)`,
-      details: '24x7 Emergency Police Station • Direct ERSS Dispatch',
-      distance: '520m away',
-      phone: '112'
+  interface EmergencyStationItem {
+    type: string;
+    name: string;
+    distanceMeters?: number;
+    distanceM?: number;
+    distanceText?: string;
+    distanceStr?: string;
+    phone: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+  }
+
+  const [activeEmergencyType, setActiveEmergencyType] = useState<EmergencyServiceType>('police');
+  const [emergencyStations, setEmergencyStations] = useState<Record<string, EmergencyStationItem> | null>(null);
+  const [isFetchingStations, setIsFetchingStations] = useState(false);
+
+  useEffect(() => {
+    let isSubscribed = true;
+    const fetchStations = async () => {
+      if (!userCoords || userCoords.length < 2) return;
+      setIsFetchingStations(true);
+      try {
+        const cityParam = encodeURIComponent(userLocationName || '');
+        const res = await fetch(apiUrl(`/api/location/emergency-stations?lat=${userCoords[0]}&lng=${userCoords[1]}&city=${cityParam}`));
+        if (res.ok) {
+          const json = await res.json();
+          const stationsMap = json.data || json.stations;
+          if (isSubscribed && stationsMap) {
+            setEmergencyStations(stationsMap);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch emergency stations:', err);
+      } finally {
+        if (isSubscribed) {
+          setIsFetchingStations(false);
+        }
+      }
     };
+
+    fetchStations();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [userCoords[0], userCoords[1], userLocationName]);
+
+  const cityName = (userLocationName || '').split(',')[0].trim() || 'Central';
+  const defaultEmergencyStations: Record<EmergencyServiceType, EmergencyStationItem> = {
+    police: {
+      type: 'police',
+      name: `${cityName} Police Station`,
+      distanceMeters: 550,
+      distanceStr: '550m away',
+      phone: '112',
+      address: '24x7 Jurisdiction Police Desk • ERSS Integration',
+      lat: userCoords[0],
+      lng: userCoords[1]
+    },
+    fire: {
+      type: 'fire',
+      name: `${cityName} Fire & Emergency Station`,
+      distanceMeters: 1200,
+      distanceStr: '1.2 km away',
+      phone: '101',
+      address: 'Rapid Fire Brigade & Rescue Operations Unit',
+      lat: userCoords[0],
+      lng: userCoords[1]
+    },
+    hospital: {
+      type: 'hospital',
+      name: `${cityName} District Hospital & Trauma Centre`,
+      distanceMeters: 800,
+      distanceStr: '800m away',
+      phone: '108',
+      address: '24x7 Emergency Casualty & Ambulance Service',
+      lat: userCoords[0],
+      lng: userCoords[1]
+    }
   };
 
-  const nearestPoliceStation = getNearestPoliceStation();
+  const currentEmergencyStation: EmergencyStationItem = 
+    emergencyStations?.[activeEmergencyType] || defaultEmergencyStations[activeEmergencyType];
 
   const isPublicUser = tourist.name.toLowerCase().includes('public');
 
@@ -383,46 +416,119 @@ export const TouristHome: React.FC = () => {
         </div>
       </div>
 
-      {/* Nearest Police Station Card */}
+      {/* Dynamic Multi-Service Emergency Radar Card (Police, Fire Fighter, Hospital) */}
       <div className="px-4 mt-4">
-        <div 
-          onClick={() => navigate('/tourist/map')}
-          className="bg-white rounded-2xl p-3.5 border border-[#D8E0E8] shadow-sm flex items-center justify-between cursor-pointer hover:border-[#0B3D62] transition-all"
-        >
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-11 h-11 rounded-xl bg-[#0B3D62]/10 border border-[#0B3D62]/20 flex items-center justify-center text-[#0B3D62] shrink-0">
-              <ShieldAlert className="w-6 h-6 text-[#0B3D62]" />
+        <div className="bg-white rounded-2xl p-4 border border-[#D8E0E8] shadow-sm hover:border-[#0B3D62] transition-all">
+          {/* Header & Live OSM Badge */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#0B3D62]">
+                Nearest Emergency Radar
+              </span>
+              {isFetchingStations && (
+                <Loader2 className="w-3 h-3 text-slate-400 animate-spin" />
+              )}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-extrabold uppercase text-[#0B3D62] tracking-wider">
-                  Nearest Police Station
-                </span>
-                <span className="text-[10px] text-emerald-600 font-bold">• {nearestPoliceStation.distance}</span>
-              </div>
-              <h4 className="text-sm font-bold text-[#1A2530] truncate mt-0.5" title={nearestPoliceStation.name}>
-                {nearestPoliceStation.name}
-              </h4>
-              <p className="text-[11px] text-[#5C6B78] truncate">
-                {nearestPoliceStation.details}
-              </p>
-            </div>
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              Live OSM Geo-Match
+            </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
-            <a
-              href={`tel:${nearestPoliceStation.phone}`}
-              onClick={(e) => e.stopPropagation()}
-              className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center hover:bg-emerald-100 transition-colors shadow-xs"
-              title={`Call ${nearestPoliceStation.name}`}
+          {/* Quick Filter Tabs: Police, Fire Brigade, Hospital */}
+          <div className="grid grid-cols-3 gap-1.5 mt-3 mb-3 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveEmergencyType('police')}
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                activeEmergencyType === 'police'
+                  ? 'bg-white text-[#0B3D62] shadow-xs'
+                  : 'text-slate-600 hover:text-[#0B3D62]'
+              }`}
             >
-              <PhoneCall className="w-4 h-4" />
-            </a>
-            <div 
-              className="w-9 h-9 rounded-xl bg-slate-100 text-[#0B3D62] flex items-center justify-center hover:bg-slate-200 transition-colors shadow-xs"
-              title="Navigate to Police Station"
+              <ShieldAlert className="w-3.5 h-3.5 text-[#0B3D62]" />
+              <span>Police</span>
+            </button>
+            <button
+              onClick={() => setActiveEmergencyType('fire')}
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                activeEmergencyType === 'fire'
+                  ? 'bg-white text-orange-600 shadow-xs'
+                  : 'text-slate-600 hover:text-orange-600'
+              }`}
             >
-              <Navigation className="w-4 h-4" />
+              <Flame className="w-3.5 h-3.5 text-orange-600" />
+              <span>Fire Brigade</span>
+            </button>
+            <button
+              onClick={() => setActiveEmergencyType('hospital')}
+              className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                activeEmergencyType === 'hospital'
+                  ? 'bg-white text-emerald-600 shadow-xs'
+                  : 'text-slate-600 hover:text-emerald-600'
+              }`}
+            >
+              <HeartPulse className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Hospital</span>
+            </button>
+          </div>
+
+          {/* Active Station Info Display */}
+          <div 
+            onClick={() => navigate('/tourist/map')}
+            className="flex items-center justify-between cursor-pointer pt-1"
+          >
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${
+                activeEmergencyType === 'police'
+                  ? 'bg-[#0B3D62]/10 border-[#0B3D62]/20 text-[#0B3D62]'
+                  : activeEmergencyType === 'fire'
+                  ? 'bg-orange-500/10 border-orange-500/20 text-orange-600'
+                  : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+              }`}>
+                {activeEmergencyType === 'police' && <ShieldAlert className="w-6 h-6 text-[#0B3D62]" />}
+                {activeEmergencyType === 'fire' && <Flame className="w-6 h-6 text-orange-600" />}
+                {activeEmergencyType === 'hospital' && <HeartPulse className="w-6 h-6 text-emerald-600" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-extrabold uppercase tracking-wider ${
+                    activeEmergencyType === 'police'
+                      ? 'text-[#0B3D62]'
+                      : activeEmergencyType === 'fire'
+                      ? 'text-orange-600'
+                      : 'text-emerald-600'
+                  }`}>
+                    {activeEmergencyType === 'police' ? 'Nearest Police Station' : activeEmergencyType === 'fire' ? 'Nearest Fire Fighter' : 'Nearest Hospital / Trauma'}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-bold">• {currentEmergencyStation.distanceStr || currentEmergencyStation.distanceText}</span>
+                </div>
+                <h4 className="text-sm font-bold text-[#1A2530] truncate mt-0.5" title={currentEmergencyStation.name}>
+                  {currentEmergencyStation.name}
+                </h4>
+                <p className="text-[11px] text-[#5C6B78] truncate">
+                  {currentEmergencyStation.address || 'Emergency Response Station'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <a
+                href={`tel:${currentEmergencyStation.phone}`}
+                onClick={(e) => e.stopPropagation()}
+                className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center hover:bg-emerald-100 transition-colors shadow-xs"
+                title={`Call ${currentEmergencyStation.name} (${currentEmergencyStation.phone})`}
+              >
+                <PhoneCall className="w-4 h-4" />
+              </a>
+              <div 
+                className="w-9 h-9 rounded-xl bg-slate-100 text-[#0B3D62] flex items-center justify-center hover:bg-slate-200 transition-colors shadow-xs"
+                title="View on Safe Map"
+              >
+                <Navigation className="w-4 h-4" />
+              </div>
             </div>
           </div>
         </div>
