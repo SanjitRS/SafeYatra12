@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { ArrowLeft, User, Phone, HeartPulse, MapPin, Calendar, ChevronDown, ChevronUp, Save, Check } from 'lucide-react';
+import { ArrowLeft, User, Phone, HeartPulse, MapPin, Calendar, ChevronDown, ChevronUp, Save, Check, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSafety } from '../../lib/safetyStore';
 
 export const ProfileSafetyInfo: React.FC = () => {
   const navigate = useNavigate();
-  const { tourist, updateTouristProfile } = useSafety();
+  const { tourist, updateTouristProfile, logoutTourist } = useSafety();
 
   const [openCard, setOpenCard] = useState<'itinerary' | 'contact' | 'medical' | 'stay'>('contact');
   const [isSaved, setIsSaved] = useState(false);
@@ -256,6 +256,19 @@ export const ProfileSafetyInfo: React.FC = () => {
               <span>Save Profile Updates</span>
             </>
           )}
+        </button>
+
+        {/* Switch Profile / Log Out Button */}
+        <button
+          type="button"
+          onClick={() => {
+            logoutTourist();
+            navigate('/tourist');
+          }}
+          className="w-full py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-[#D64545] border border-red-200 text-xs font-bold transition-colors flex items-center justify-center gap-2 mt-2"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Switch Profile / Log Out</span>
         </button>
       </form>
     </div>

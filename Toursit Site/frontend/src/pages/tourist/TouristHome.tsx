@@ -11,7 +11,8 @@ import {
   ShieldAlert, 
   ChevronRight,
   Crosshair,
-  HeartPulse
+  HeartPulse,
+  LogOut
 } from 'lucide-react';
 import { useSafety } from '../../lib/safetyStore';
 
@@ -25,7 +26,8 @@ export const TouristHome: React.FC = () => {
     userLocationName, 
     userAltitude, 
     isLiveGps, 
-    refreshLocation 
+    refreshLocation,
+    logoutTourist 
   } = useSafety();
 
   // Hold-to-activate state for tactile thumb-zone SOS button
@@ -94,13 +96,22 @@ export const TouristHome: React.FC = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => navigate('/tourist/id')}
-            className="w-10 h-10 rounded-full bg-[#002743]/80 hover:bg-[#1C7293] flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20"
-            title="Open Digital ID"
-          >
-            <QrCode className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => navigate('/tourist/id')}
+              className="w-10 h-10 rounded-full bg-[#002743]/80 hover:bg-[#1C7293] flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20 shadow-sm"
+              title="Open Digital ID"
+            >
+              <QrCode className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => logoutTourist()}
+              className="w-10 h-10 rounded-full bg-[#002743]/80 hover:bg-red-950/80 hover:text-red-400 flex items-center justify-center text-cyan-200 transition-colors border border-cyan-400/20 shadow-sm"
+              title="Switch Profile / Log Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* GPS Coordinates Bar */}

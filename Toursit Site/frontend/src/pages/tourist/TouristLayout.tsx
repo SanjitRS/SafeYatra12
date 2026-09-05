@@ -4,11 +4,12 @@ import { Home, ShieldAlert, QrCode, MapPin, Phone, User, CheckCircle2, Wifi, Bat
 import { Capacitor } from '@capacitor/core';
 import { useSafety } from '../../lib/safetyStore';
 import { AiEmergencyAssistant } from '../../components/common/AiEmergencyAssistant';
+import { TouristAuth } from './TouristAuth';
 
 export const TouristLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeTouristSos, tourist } = useSafety();
+  const { activeTouristSos, isLoggedIn } = useSafety();
   const isNative = Capacitor.isNativePlatform();
 
   const navItems = [
@@ -30,6 +31,14 @@ export const TouristLayout: React.FC = () => {
 
   // On Native Android device / Android Studio: Full native screen
   if (isNative) {
+    if (!isLoggedIn) {
+      return (
+        <div className="w-full h-screen min-h-screen bg-white text-[#1A2530] flex flex-col overflow-y-auto">
+          <TouristAuth />
+        </div>
+      );
+    }
+
     return (
       <div className="w-full h-screen min-h-screen bg-white text-[#1A2530] flex flex-col relative overflow-hidden">
         {/* Dynamic Route Content filling device screen */}
@@ -72,6 +81,41 @@ export const TouristLayout: React.FC = () => {
 
         {/* Global AI Emergency Voice & SOS Assistant */}
         <AiEmergencyAssistant />
+      </div>
+    );
+  }
+
+  // Not logged in: Show Login & Location Setup Screen inside the phone container
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-slate-900 sm:bg-[#EBF1F6] text-[#1A2530] flex flex-col items-center justify-start sm:py-6 px-0 sm:px-4 select-none">
+        <div className="w-full sm:max-w-[430px] min-h-screen sm:min-h-[850px] sm:max-h-[92vh] bg-white sm:rounded-[44px] sm:shadow-2xl sm:border-[8px] sm:border-slate-800 overflow-hidden flex flex-col relative">
+          {/* Phone Top Status Bar */}
+          <div className="w-full bg-[#0B3D62] text-white px-5 pt-3 pb-2 flex items-center justify-between text-xs font-semibold select-none shrink-0 z-20">
+            <span className="font-mono">09:41</span>
+            <div className="w-24 h-4 bg-[#002743] rounded-full mx-auto hidden sm:block"></div>
+            <div className="flex items-center gap-2 text-white/90">
+              <Wifi className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-mono">5G</span>
+              <BatteryCharging className="w-4 h-4 text-emerald-400" />
+            </div>
+          </div>
+
+          {/* Dynamic Login & Location Setup Content */}
+          <div className="flex-1 flex flex-col overflow-y-auto">
+            <TouristAuth />
+          </div>
+        </div>
+
+        {/* Trust & Architecture Reassurance Footer */}
+        <div className="hidden sm:flex w-full max-w-[430px] mt-3 items-center justify-center gap-3 text-center text-xs text-slate-500 font-medium">
+          <span className="flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#1C7293]" />
+            ISRO NavIC High-Precision Geofencing
+          </span>
+          <span>•</span>
+          <span>Offline SMS Distress Fallback</span>
+        </div>
       </div>
     );
   }

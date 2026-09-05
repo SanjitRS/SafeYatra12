@@ -45,6 +45,10 @@ interface SafetyContextType {
   playAckChime: () => void;
   systemNotification: { id: string; message: string; type: 'urgent' | 'info' | 'success' } | null;
   clearNotification: () => void;
+  isLoggedIn: boolean;
+  loginTourist: (profile: Partial<TouristProfile>, location?: { coords: [number, number]; name: string; altitude?: number }) => void;
+  logoutTourist: () => void;
+  setUserLocation: (coords: [number, number], name: string, altitude?: number) => void;
 }
 
 const STORAGE_KEYS = {
@@ -802,6 +806,50 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }));
   }, []);
 
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem('safeyatra_tourist_logged_in') === 'true';
+  });
+
+  const setUserLocation = useCallback((coords: [number, number], name: string, altitude?: number) => {
+    setUserCoords(coords);
+    setUserLocationName(name);
+    if (altitude != null) setUserAltitude(altitude);
+    setIsLiveGps(true);
+    setGpsActive(true);
+    sendLocationPing(coords[0], coords[1], altitude || 0, 10);
+  }, [sendLocationPing]);
+
+  const loginTourist = useCallback((profile: Partial<TouristProfile>, location?: { coords: [number, number]; name: string; altitude?: number }) => {
+    setIsLoggedIn(true);
+    localStorage.setItem('safeyatra_tourist_logged_in', 'true');
+    if (profile) {
+      setTourist(prev => ({
+        ...prev,
+        ...profile,
+        qrPayload: JSON.stringify({
+          id: profile.id || prev.id,
+          name: profile.name || prev.name,
+          blood: profile.bloodGroup || prev.bloodGroup,
+          emergency: profile.emergencyContact?.phone || prev.emergencyContact.phone,
+          valid: profile.validUntil || prev.validUntil
+        })
+      }));
+    }
+    if (location) {
+      setUserCoords(location.coords);
+      setUserLocationName(location.name);
+      if (location.altitude != null) setUserAltitude(location.altitude);
+      setIsLiveGps(true);
+      setGpsActive(true);
+      sendLocationPing(location.coords[0], location.coords[1], location.altitude || 0, 10);
+    }
+  }, [sendLocationPing]);
+
+  const logoutTourist = useCallback(() => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('safeyatra_tourist_logged_in');
+  }, []);
+
   const clearNotification = () => setSystemNotification(null);
 
   return (
@@ -838,7 +886,11 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playEmergencyChime,
         playAckChime,
         systemNotification,
-        clearNotification
+        clearNotification,
+        isLoggedIn,
+        loginTourist,
+        logoutTourist,
+        setUserLocation
       }}
     >
       {children}
