@@ -6,12 +6,7 @@ import {
   Map, 
   Users, 
   ShieldCheck, 
-  Radio, 
-  Smartphone, 
-  PhoneCall, 
-  Search,
-  LogOut,
-  ChevronRight
+  Radio
 } from 'lucide-react';
 import { useSafety } from '../../lib/safetyStore';
 
@@ -111,26 +106,26 @@ export const AuthorityLayout: React.FC = () => {
             </nav>
           </div>
 
-          {/* Dual Simulation Links */}
+          {/* Tactical Dispatch & Telemetry Status */}
           <div className="pt-4 border-t border-white/10">
-            <p className="text-[10px] uppercase tracking-widest text-[#1C7293] font-bold mb-2 px-2">
-              Dual Simulation
+            <p className="text-[10px] uppercase tracking-widest text-cyan-300 font-bold mb-2 px-2">
+              Dispatch Telemetry
             </p>
-            <div className="space-y-1">
-              <button
-                onClick={() => navigate('/tourist')}
-                className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-xs font-semibold opacity-70 hover:opacity-100 hover:bg-white/5 transition-all text-left"
-              >
-                <Smartphone className="w-4 h-4 text-[#1C7293]" />
-                <span>Launch Tourist Simulator</span>
-              </button>
-              <button
-                onClick={() => navigate('/tourist/resources')}
-                className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-xs font-semibold opacity-70 hover:opacity-100 hover:bg-white/5 transition-all text-left"
-              >
-                <PhoneCall className="w-4 h-4 text-[#1C7293]" />
-                <span>Helpline Operations Hub</span>
-              </button>
+            <div className="p-3 rounded-xl bg-[#002743]/80 border border-cyan-500/20 text-xs space-y-2">
+              <div className="flex items-center justify-between text-cyan-200">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                  NavIC Satellites
+                </span>
+                <span className="font-mono text-emerald-400 font-bold">L5/S Lock</span>
+              </div>
+              <div className="flex items-center justify-between text-cyan-200">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Emergency Grid
+                </span>
+                <span className="font-mono text-white text-[11px]">112 / 100 Sync</span>
+              </div>
             </div>
           </div>
         </div>

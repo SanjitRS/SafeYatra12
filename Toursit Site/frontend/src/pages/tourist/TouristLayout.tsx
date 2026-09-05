@@ -77,12 +77,12 @@ export const TouristLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FA] text-[#1A2530] flex flex-col items-center justify-start pb-20 pt-20 px-3 sm:px-4">
-      {/* Container simulating a mobile phone viewport on desktop or fluid on mobile */}
-      <div className="w-full max-w-[440px] bg-white rounded-[32px] sm:rounded-[40px] shadow-xl border border-[#D8E0E8] overflow-hidden flex flex-col relative min-h-[760px]">
+    <div className="min-h-screen bg-slate-900 sm:bg-[#EBF1F6] text-[#1A2530] flex flex-col items-center justify-start sm:py-6 px-0 sm:px-4 select-none">
+      {/* Container simulating a mobile phone viewport on desktop or full-bleed responsive on mobile */}
+      <div className="w-full sm:max-w-[430px] min-h-screen sm:min-h-[850px] sm:max-h-[92vh] bg-white sm:rounded-[44px] sm:shadow-2xl sm:border-[8px] sm:border-slate-800 overflow-hidden flex flex-col relative">
         {/* Phone Top Status Bar */}
-        <div className="w-full bg-[#0B3D62] text-white px-5 pt-3 pb-2 flex items-center justify-between text-xs font-semibold select-none">
-          <span>09:41</span>
+        <div className="w-full bg-[#0B3D62] text-white px-5 pt-3 pb-2 flex items-center justify-between text-xs font-semibold select-none shrink-0 z-20">
+          <span className="font-mono">09:41</span>
           <div className="w-24 h-4 bg-[#002743] rounded-full mx-auto hidden sm:block"></div>
           <div className="flex items-center gap-2 text-white/90">
             <Wifi className="w-3.5 h-3.5" />
@@ -92,12 +92,12 @@ export const TouristLayout: React.FC = () => {
         </div>
 
         {/* Dynamic Route Content */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex-1 flex flex-col overflow-y-auto pb-20">
           <Outlet />
         </div>
 
         {/* Persistent Bottom Mobile Navigation Bar */}
-        <nav className="w-full bg-white border-t border-[#E8EDF2] py-2 px-3 flex items-center justify-around z-30 select-none shadow-sm">
+        <nav className="fixed sm:absolute bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-[#E8EDF2] py-2 px-3 flex items-center justify-around z-30 select-none shadow-lg">
           {navItems.map((item) => {
             const isActive = currentPath === item.path || (item.path !== '/tourist' && currentPath.startsWith(item.path));
             const Icon = item.icon;
@@ -128,16 +128,16 @@ export const TouristLayout: React.FC = () => {
             );
           })}
         </nav>
+
+        {/* Global AI Emergency Voice & SOS Assistant */}
+        <AiEmergencyAssistant />
       </div>
 
-      {/* Global AI Emergency Voice & SOS Assistant */}
-      <AiEmergencyAssistant />
-
-      {/* Trust & Architecture Reassurance Footer */}
-      <div className="w-full max-w-[440px] mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-xs text-[#5C6B78]">
+      {/* Trust & Architecture Reassurance Footer (Desktop Mode) */}
+      <div className="hidden sm:flex w-full max-w-[430px] mt-3 items-center justify-center gap-3 text-center text-xs text-slate-500 font-medium">
         <span className="flex items-center gap-1">
           <CheckCircle2 className="w-3.5 h-3.5 text-[#1C7293]" />
-          ISRO NavIC Precision Geofencing
+          ISRO NavIC High-Precision Geofencing
         </span>
         <span>•</span>
         <span>Offline SMS Distress Fallback</span>

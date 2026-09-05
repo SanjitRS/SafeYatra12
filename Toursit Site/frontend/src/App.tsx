@@ -37,13 +37,11 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <SafetyProvider>
         <BrowserRouter>
-          {/* Global Header is displayed on desktop web only, hidden on Android app */}
-          {!isNative && <GlobalHeader />}
           <Routes>
             {/* Opens Tourist App by default */}
             <Route path="/" element={<Navigate to="/tourist" replace />} />
 
-            {/* Tourist App Routes */}
+            {/* Tourist App Routes - 100% Pure Standalone Tourist Safety Mobile Experience */}
             <Route path="/tourist" element={<TouristLayout />}>
               <Route index element={<TouristHome />} />
               <Route path="sos" element={<SosFlow />} />
@@ -55,9 +53,17 @@ export default function App() {
               <Route path="auth" element={<TouristAuth />} />
             </Route>
 
-            {/* Authority Console Routes */}
+            {/* Authority Console Routes - Standalone Tactical Command Center */}
             <Route path="/authority/login" element={<AuthorityAuth />} />
-            <Route path="/authority" element={<AuthorityLayout />}>
+            <Route
+              path="/authority"
+              element={
+                <>
+                  <GlobalHeader />
+                  <AuthorityLayout />
+                </>
+              }
+            >
               <Route index element={<AuthorityDashboard />} />
               <Route path="live-sos" element={<LiveSosFeed />} />
               <Route path="incidents" element={<IncidentManagement />} />
