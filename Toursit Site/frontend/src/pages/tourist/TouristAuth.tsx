@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, MapPin, Radio, Crosshair, CheckCircle2, Navigation, Loader2, Lock } from 'lucide-react';
 import { useSafety } from '../../lib/safetyStore';
@@ -20,7 +20,7 @@ const DESTINATION_PRESETS: DestinationPreset[] = [
 
 export const TouristAuth: React.FC = () => {
   const navigate = useNavigate();
-  const { loginTourist, refreshLocation, userCoords, userLocationName, userAltitude } = useSafety();
+  const { loginTourist, refreshLocation, userCoords, userLocationName, userAltitude, setUserLocation } = useSafety();
 
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('Aarav Sharma');
@@ -28,66 +28,157 @@ export const TouristAuth: React.FC = () => {
   const [email, setEmail] = useState('aarav.sharma@safeyatra.in');
 
   // Location selection states
-  const [selectedLocation, setSelectedLocation] = useState<string>(userLocationName || 'Manali, Himachal Pradesh');
-  const [selectedCoords, setSelectedCoords] = useState<[number, number]>(userCoords || [32.2432, 77.1892]);
-  const [selectedAltitude, setSelectedAltitude] = useState<number>(userAltitude || 2050);
+  const [selectedLocation, setSelectedLocation] = useState<string>(userLocationName || 'Detecting Live Location...');
+  const [selectedCoords, setSelectedCoords] = useState<[number, number]>(userCoords || [12.9716, 77.5946]);
+  const [selectedAltitude, setSelectedAltitude] = useState<number>(userAltitude || 920);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
-  const [locationLocked, setLocationLocked] = useState<boolean>(true);
+  const [locationLocked, setLocationLocked] = useState<boolean>(false);
+  const [locationSource, setLocationSource] = useState<'gps' | 'network' | 'preset'>('preset');
+  const [locationStatusMessage, setLocationStatusMessage] = useState<string>('');
+  const [permissionNotice, setPermissionNotice] = useState<string | null>(null);
 
-  // Trigger real device hardware GPS detection
+  // Fast reverse geocoding via BigDataCloud client API + Nominatim fallback
+  const reverseGeocodeCoords = async (lat: number, lng: number): Promise<string> => {
+    try {
+      const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+      if (bdcRes.ok) {
+        const bdcData = await bdcRes.json();
+        const city = bdcData.city || bdcData.locality || bdcData.localityInfo?.administrative?.[2]?.name;
+        const region = bdcData.principalSubdivision || bdcData.countryName || '';
+        if (city && region) return `${city}, ${region}`;
+        if (city) return city;
+        if (region) return region;
+      }
+    } catch {}
+
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`);
+      if (res.ok) {
+        const data = await res.json();
+        const address = data.address || {};
+        const place = address.suburb || address.town || address.village || address.city || address.county || data.display_name?.split(',')[0] || 'Current Location';
+        const region = address.state || address.country || '';
+        return region ? `${place}, ${region}` : place;
+      }
+    } catch {}
+
+    return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
+  };
+
+  // Instant network IP geolocation fallback (works even if device GPS is off or permission blocked)
+  const fetchIPFallback = async (): Promise<{ coords: [number, number]; name: string } | null> => {
+    try {
+      const res = await fetch('https://ipwho.is/');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success !== false && data.latitude && data.longitude) {
+          const place = data.city ? `${data.city}, ${data.region || data.country}` : 'Current Location';
+          return { coords: [Number(data.latitude), Number(data.longitude)], name: place };
+        }
+      }
+    } catch {}
+
+    try {
+      const res = await fetch('https://freeipapi.com/api/json');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.latitude && data.longitude) {
+          const place = data.cityName ? `${data.cityName}, ${data.regionName || data.countryName}` : 'Current Location';
+          return { coords: [Number(data.latitude), Number(data.longitude)], name: place };
+        }
+      }
+    } catch {}
+
+    return null;
+  };
+
   const handleDetectGPS = async () => {
     setIsLocating(true);
-    try {
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            const { latitude, longitude, altitude } = pos.coords;
-            const newCoords: [number, number] = [latitude, longitude];
-            setSelectedCoords(newCoords);
-            if (altitude) setSelectedAltitude(Math.round(altitude));
+    setPermissionNotice(null);
+    setLocationStatusMessage('Connecting to device GPS sensor...');
 
-            // Reverse geocode
-            try {
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`);
-              if (res.ok) {
-                const data = await res.json();
-                const address = data.address || {};
-                const place = address.suburb || address.town || address.village || address.city || address.county || data.display_name?.split(',')[0] || 'Current Location';
-                const region = address.state || address.country || '';
-                const fullLoc = region ? `${place}, ${region}` : place;
-                setSelectedLocation(fullLoc);
-              } else {
-                setSelectedLocation(`${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`);
-              }
-            } catch {
-              setSelectedLocation(`${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`);
-            }
+    const onGpsSuccess = async (pos: GeolocationPosition) => {
+      const { latitude, longitude, altitude, accuracy } = pos.coords;
+      const coords: [number, number] = [latitude, longitude];
+      setSelectedCoords(coords);
+      if (altitude) setSelectedAltitude(Math.round(altitude));
+      if (accuracy) setLocationAccuracy(Math.round(accuracy));
+      setLocationSource('gps');
+      setLocationStatusMessage('Resolving exact place name...');
 
-            setLocationLocked(true);
-            setIsLocating(false);
-          },
-          (err) => {
-            console.warn('[GPS Detection Error]', err);
-            setIsLocating(false);
-            // fallback to network refresh
-            refreshLocation().then(([lat, lng]) => {
-              setSelectedCoords([lat, lng]);
-              setLocationLocked(true);
-            });
-          },
-          { enableHighAccuracy: true, timeout: 8000 }
-        );
-      }
-    } catch {
+      const placeName = await reverseGeocodeCoords(latitude, longitude);
+      setSelectedLocation(placeName);
+      setLocationLocked(true);
       setIsLocating(false);
+      setLocationStatusMessage('');
+
+      setUserLocation(coords, placeName, altitude ? Math.round(altitude) : undefined);
+    };
+
+    const onGpsFailure = async (err?: GeolocationPositionError) => {
+      console.warn('[GPS Detection Notice]', err?.message);
+      if (err?.code === 1) {
+        setPermissionNotice('GPS permission was not allowed. Automatically using Cellular/Network location.');
+      } else {
+        setLocationStatusMessage('Triangulating via Cellular/WiFi network...');
+      }
+
+      const netLoc = await fetchIPFallback();
+      if (netLoc) {
+        setSelectedCoords(netLoc.coords);
+        setSelectedLocation(netLoc.name);
+        setLocationSource('network');
+        setLocationLocked(true);
+        setIsLocating(false);
+        setLocationStatusMessage('');
+        setUserLocation(netLoc.coords, netLoc.name);
+      } else {
+        refreshLocation().then(async (coords) => {
+          setSelectedCoords(coords);
+          const name = await reverseGeocodeCoords(coords[0], coords[1]);
+          setSelectedLocation(name);
+          setLocationSource('network');
+          setLocationLocked(true);
+          setIsLocating(false);
+          setLocationStatusMessage('');
+        });
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      // Step 1: Rapid fix with standard accuracy (returns cellular/wifi fix in 300ms on mobile)
+      navigator.geolocation.getCurrentPosition(
+        onGpsSuccess,
+        () => {
+          // If rapid fix failed, try high accuracy with generous 15s timeout
+          navigator.geolocation.getCurrentPosition(
+            onGpsSuccess,
+            onGpsFailure,
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 120000 }
+          );
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+      );
+    } else {
+      onGpsFailure();
     }
   };
+
+  // Auto-run detection on initial load so the friend's phone detects immediately!
+  useEffect(() => {
+    handleDetectGPS();
+  }, []);
 
   const handleSelectPreset = (preset: DestinationPreset) => {
     setSelectedLocation(preset.name);
     setSelectedCoords(preset.coords);
     setSelectedAltitude(preset.altitude);
+    setLocationSource('preset');
+    setLocationAccuracy(null);
+    setPermissionNotice(null);
     setLocationLocked(true);
+    setUserLocation(preset.coords, preset.name, preset.altitude);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -113,6 +204,8 @@ export const TouristAuth: React.FC = () => {
     setSelectedLocation(presetDest.name);
     setSelectedCoords(presetDest.coords);
     setSelectedAltitude(presetDest.altitude);
+    setLocationSource('preset');
+    setLocationLocked(true);
     loginTourist(
       {
         name: presetName,
@@ -215,33 +308,47 @@ export const TouristAuth: React.FC = () => {
             type="button"
             onClick={handleDetectGPS}
             disabled={isLocating}
-            className="w-full py-2.5 px-3 rounded-xl bg-[#002743] hover:bg-[#0B3D62] text-cyan-200 border border-cyan-500/30 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+            className="w-full py-2.5 px-3 rounded-xl bg-[#002743] hover:bg-[#0B3D62] text-cyan-200 border border-cyan-500/30 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-98"
           >
             {isLocating ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-cyan-300" />
-                <span>Acquiring ISRO NavIC / GPS Lock...</span>
+                <span>{locationStatusMessage || 'Acquiring Live Coordinates...'}</span>
               </>
             ) : (
               <>
                 <Crosshair className="w-4 h-4 text-emerald-400" />
-                <span>Detect Live GPS Hardware Location</span>
+                <span>Detect Live GPS / Refresh Location</span>
               </>
             )}
           </button>
 
+          {/* Optional Permission / Cellular Notice */}
+          {permissionNotice && (
+            <div className="mt-2 p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-[11px] text-sky-900 flex items-start gap-2 shadow-xs">
+              <span className="shrink-0 text-sm">ℹ️</span>
+              <span className="leading-snug">{permissionNotice}</span>
+            </div>
+          )}
+
           {/* Location Status Badge */}
           {locationLocked && (
-            <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5">
+            <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 flex items-start gap-2.5 shadow-sm">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-xs font-bold text-emerald-900 leading-tight">
-                  {selectedLocation}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-emerald-700 font-mono">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-extrabold text-emerald-950 leading-tight">
+                    {selectedLocation}
+                  </p>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-800 shrink-0 ml-1">
+                    {locationSource === 'gps' ? '🛰️ Hardware GPS' : locationSource === 'network' ? '📶 Cellular / IP' : '📍 Preset'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-emerald-700 font-mono">
                   <span>{selectedCoords[0].toFixed(4)}°N, {selectedCoords[1].toFixed(4)}°E</span>
                   <span>•</span>
-                  <span>{selectedAltitude}m Altitude</span>
+                  <span>{selectedAltitude}m Alt</span>
+                  {locationAccuracy && <span>• ±{locationAccuracy}m</span>}
                 </div>
               </div>
             </div>

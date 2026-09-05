@@ -116,6 +116,20 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     lastGeocodeCoords.current = [lat, lng];
 
     try {
+      const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+      if (bdcRes.ok) {
+        const bdcData = await bdcRes.json();
+        const city = bdcData.city || bdcData.locality || bdcData.localityInfo?.administrative?.[2]?.name;
+        const region = bdcData.principalSubdivision || bdcData.countryName || '';
+        const formatted = city && region ? `${city}, ${region}` : city || region || 'Current Location';
+        setUserLocationName(formatted);
+        return formatted;
+      }
+    } catch {
+      // fallback to nominatim
+    }
+
+    try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`, {
         headers: { 'Accept-Language': 'en' }
       });
