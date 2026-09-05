@@ -192,13 +192,11 @@ export const AiEmergencyAssistant: React.FC = () => {
       playEmergencyChime();
       const reason = actionPayload?.reason || 'AI Assistant Voice/Text Emergency Trigger';
       await triggerTouristSos(reason);
-      setTimeout(() => {
-        navigate('/tourist/sos');
-      }, 1200);
+      setIsOpen(false);
+      navigate('/tourist/sos');
     } else if (action === 'CALL_EMERGENCY_CONTACT') {
       const phoneToCall = actionPayload?.phone || tourist.emergencyContact.phone;
       if (phoneToCall) {
-        // Initiate phone dialer
         window.location.href = `tel:${phoneToCall.replace(/\s+/g, '')}`;
       }
     } else if (action === 'CALL_EMERGENCY_SERVICE') {
