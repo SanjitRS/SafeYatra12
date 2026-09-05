@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { TouristProfile, SosAlert, Incident, RiskZone, PatrolUnit, RiskLevel } from '../types';
 import { INITIAL_TOURIST, INITIAL_SOS_ALERTS, INITIAL_RISK_ZONES, INITIAL_INCIDENTS, INITIAL_PATROL_UNITS } from './mockData';
 import { apiUrl } from './api';
+import { io as socketIO } from 'socket.io-client';
 
 interface SafetyContextType {
   tourist: TouristProfile;
@@ -351,10 +352,12 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // Setup broadcast channel & browser storage persistence
+  // Setup broadcast channel, socket.io real-time listener, and backend polling
   useEffect(() => {
+    // 1. BroadcastChannel for instant local same-origin synchronization
+    let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      const bc = new BroadcastChannel('safeyatra_channel');
+      bc = new BroadcastChannel('safeyatra_channel');
       bc.onmessage = (event) => {
         const { type, payload } = event.data;
         if (type === 'SOS_UPDATED') {
@@ -373,10 +376,130 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       };
       setBroadcast(bc);
-      return () => {
-        bc.close();
-      };
     }
+
+    // 2. Cross-domain Socket.IO Real-Time Dispatch Listener
+    let socket: any = null;
+    try {
+      socket = socketIO(window.location.origin, {
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', () => {
+        setSocketConnected(true);
+        socket.emit('join:role', { role: 'authority' });
+        socket.emit('authority:join', { role: 'authority' });
+      });
+
+      const handleIncomingSos = (data: any) => {
+        if (!data) return;
+        const sosId = data.alertId || data.sosId || (data._id ? data._id.toString() : `SOS-${Date.now().toString().slice(-5)}`);
+        const touristName = data.tourist?.name || data.touristProfileSnapshot?.name || data.touristName || 'Arun Sharma (Tourist)';
+        const touristPhone = data.tourist?.phone || data.touristProfileSnapshot?.phone || data.touristPhone || '+91 94180 22101';
+        const address = data.location?.address || data.message || data.note || 'Live GPS Coordinates';
+
+        const incomingAlert: SosAlert = {
+          id: sosId,
+          touristId: data.tourist?.id || data.touristId || 'T-LIVE',
+          touristName,
+          touristPhone,
+          timestamp: data.timestamp || data.createdAt || new Date().toISOString(),
+          status: 'triggered',
+          severity: (data.aiAnalysis?.predictedSeverity || data.severity || 'critical').toLowerCase() as any,
+          location: {
+            lat: data.location?.lat || 12.9716,
+            lng: data.location?.lng || 77.5946,
+            altitude: data.location?.altitude || 920,
+            accuracy: data.location?.accuracy || 10,
+            address,
+            sector: 'Live Satellite Sector'
+          },
+          batteryLevel: data.batteryLevel || 85,
+          altitudeM: data.location?.altitude || 920,
+          notes: data.note || data.message || 'Distress signal received by Authority Console'
+        };
+
+        setActiveSosAlerts((prev) => {
+          if (prev.some(a => a.id === incomingAlert.id)) return prev;
+          return [incomingAlert, ...prev];
+        });
+
+        playEmergencyChime();
+        setSystemNotification({
+          id: Date.now().toString(),
+          message: `🚨 URGENT SOS ALERT: ${touristName} reported emergency at ${address}!`,
+          type: 'urgent'
+        });
+      };
+
+      socket.on('sos:emergency', handleIncomingSos);
+      socket.on('sos:new', handleIncomingSos);
+      socket.on('sos:dispatched', handleIncomingSos);
+    } catch {
+      // offline socket fallback
+    }
+
+    // 3. Resilient Polling Fallback (Polls active SOS alerts every 2.5s)
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(apiUrl('/api/sos/active'));
+        if (res.ok) {
+          const json = await res.json();
+          const alertsList = json.data || json.alerts || (Array.isArray(json) ? json : []);
+          if (Array.isArray(alertsList) && alertsList.length > 0) {
+            setActiveSosAlerts((prev) => {
+              let hasNew = false;
+              const merged = [...prev];
+              alertsList.forEach((item: any) => {
+                const id = item._id ? item._id.toString() : item.id;
+                if (!merged.some(m => m.id === id)) {
+                  hasNew = true;
+                  const newAlert: SosAlert = {
+                    id,
+                    touristId: item.touristId?._id?.toString() || item.touristId || 'T-LIVE',
+                    touristName: item.touristProfileSnapshot?.name || item.touristId?.name || 'Arun Sharma (Tourist)',
+                    touristPhone: item.touristProfileSnapshot?.phone || item.touristId?.phone || '+91 94180 22101',
+                    timestamp: item.createdAt || item.triggeredAt || new Date().toISOString(),
+                    status: item.status === 'active' ? 'triggered' : (item.status || 'triggered'),
+                    severity: (item.severity || 'critical').toLowerCase() as any,
+                    location: {
+                      lat: item.location?.lat || 12.9716,
+                      lng: item.location?.lng || 77.5946,
+                      altitude: item.location?.altitude || 920,
+                      accuracy: item.location?.accuracy || 10,
+                      address: item.location?.address || item.message || 'Live Coordinates',
+                      sector: 'Emergency Dispatch Sector'
+                    },
+                    batteryLevel: item.batteryLevel || 85,
+                    altitudeM: item.location?.altitude || 920,
+                    notes: item.message || item.note || 'Emergency SOS triggered'
+                  };
+                  merged.unshift(newAlert);
+                }
+              });
+              if (hasNew) {
+                playEmergencyChime();
+                setSystemNotification({
+                  id: Date.now().toString(),
+                  message: `🚨 Real-time SOS: Incoming distress call registered in dispatch queue!`,
+                  type: 'urgent'
+                });
+                return merged;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch {
+        // network polling fallback
+      }
+    }, 2500);
+
+    return () => {
+      if (bc) bc.close();
+      if (socket) socket.disconnect();
+      clearInterval(pollInterval);
+    };
   }, [playEmergencyChime]);
 
   // Persist to local storage
@@ -451,6 +574,11 @@ export const SafetyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             address: dynamicAddress,
             accuracy: userAccuracy
           },
+          tourist: {
+            name: tourist.name,
+            phone: tourist.phone
+          },
+          message: reason || 'Urgent distress beacon manually triggered by tourist.',
           reason: reason || 'Urgent distress beacon manually triggered by tourist.',
           batteryLevel: 85
         })

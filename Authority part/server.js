@@ -52,6 +52,15 @@ if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist, { index: false }));
 }
 
+// Cross-backend live emergency distress bridge
+app.post(['/api/authority/sos/broadcast', '/authority/sos/broadcast', '/api/sos/broadcast'], (req, res) => {
+  const payload = req.body;
+  const { broadcastToAuthorities } = require('./utils/socket');
+  broadcastToAuthorities('sos:emergency', payload);
+  broadcastToAuthorities('sos:new', payload);
+  res.status(200).json({ success: true, message: 'Relayed to authority dashboard sockets' });
+});
+
 // Dedicated health endpoints
 app.get(['/health', '/api/health'], (req, res) => {
   res.status(200).json({
