@@ -46,11 +46,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
 }
-app.use('/portal', express.static(path.join(__dirname, 'public')));
-
-// Portal route: interactive developer / judge command center
+// Route /portal directly to the React Authority Command Center
 app.get('/portal', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.redirect('/authority');
 });
 
 // Dedicated health endpoints
@@ -73,7 +71,13 @@ app.get(['/health', '/api/health'], (req, res) => {
 
 // Helper function to mount routes both with and without '/api' prefix
 const mountRoute = (routePath, router) => {
-  app.use(routePath, router);
+  app.use(routePath, (req, res, next) => {
+    // If browser navigates for HTML page, let it pass to SPA fallback
+    if ((req.method === 'GET' || req.method === 'HEAD') && req.accepts('html') && !req.xhr && !req.headers.accept?.includes('application/json')) {
+      return next();
+    }
+    router(req, res, next);
+  });
   app.use(`/api${routePath}`, router);
 };
 

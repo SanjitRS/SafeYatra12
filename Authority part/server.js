@@ -39,19 +39,18 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 const fs = require('fs');
-const frontendDist = path.join(__dirname, 'frontend', 'dist');
+const frontendDist = path.join(__dirname, '..', 'Toursit Site', 'frontend', 'dist');
 
-// Serve uploaded media, React frontend dist, and command center portal
+// Serve uploaded media, React frontend dist
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-if (fs.existsSync(frontendDist)) {
-  app.use(express.static(frontendDist));
-}
-app.use('/portal', express.static(path.join(__dirname, 'public')));
-
-// Portal route: interactive developer / judge command center
-app.get('/portal', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// Route root and /portal directly to the React Authority Command Center
+app.get(['/', '/portal'], (req, res) => {
+  res.redirect('/authority');
 });
+
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist, { index: false }));
+}
 
 // Dedicated health endpoints
 app.get(['/health', '/api/health'], (req, res) => {
@@ -73,7 +72,13 @@ app.get(['/health', '/api/health'], (req, res) => {
 
 // Helper function to mount routes both with and without '/api' prefix
 const mountRoute = (routePath, router) => {
-  app.use(routePath, router);
+  app.use(routePath, (req, res, next) => {
+    // If browser navigates for HTML page, let it pass to SPA fallback
+    if ((req.method === 'GET' || req.method === 'HEAD') && req.accepts('html') && !req.xhr && !req.headers.accept?.includes('application/json')) {
+      return next();
+    }
+    router(req, res, next);
+  });
   app.use(`/api${routePath}`, router);
 };
 
